@@ -1,9 +1,16 @@
 {
-  "name": "KG Pro Quiz",
-  "short_name": "KG Pro",
+  "name": "KG English Quiz App",
+  "short_name": "KG Quiz",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#fff8df",
-  "theme_color": "#4b8cff",
-  "icons": []
+  "background_color": "#fff7cc",
+  "theme_color": "#ffd54f",
+  "icons": [
+    {
+      "src": "school-logo.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }
