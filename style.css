@@ -467,3 +467,14 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
 .search-results-note{color:#5d718d;font-size:.92rem}
 .search-results-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
 #questionNoResults{color:#e55252;font-weight:700}
+
+
+/* v38.9 admin power fix */
+#archivedTestsPanel .stored-question, #archivedTestsPanel .question-edit-card, #accessAccountsList .question-edit-card{
+  margin-bottom:10px;
+}
+.admin-tools-strong{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}

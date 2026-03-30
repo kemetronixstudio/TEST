@@ -156,11 +156,11 @@
       <div class="action-row"><button class="main-btn" id="addQuestionBtn" data-i18n="addQuestion">Add Question</button></div>
       <div class="section-head sub-head"><h3 data-i18n="modifyExistingQuestions">Modify Existing Questions</h3><div class="editor-filters"><button class="level-btn active" data-filter-grade="all">All</button><button class="level-btn" data-filter-grade="KG1">KG1</button><button class="level-btn" data-filter-grade="KG2">KG2</button></div></div>
       <div class="editor-grid v382-filters"><input id="qSearchInput" placeholder="Search questions"><input id="qSkillFilterInput" placeholder="Filter by skill"><input id="qClassFilterInput" placeholder="Filter by class e.g. KG1 or Class 1"></div>
-      <div class="toolbar v384-search-tools"><button class="main-btn" id="runQuestionSearchBtn">Search</button><button class="ghost-btn" id="clearQuestionSearchBtn">Clear Filters</button><span class="search-results-note" id="questionSearchStatus">Search results appear below automatically.</span></div>
+      <div class="toolbar v384-search-tools"><button class="main-btn" id="runQuestionSearchBtn">Search</button><button class="ghost-btn" id="clearQuestionSearchBtn">Clear Filters</button><button class="ghost-btn" id="showAllQuestionsBtn">Show All Questions</button><span class="search-results-note" id="questionSearchStatus">Search results appear below automatically.</span></div>
       <p class="muted-note" data-i18n="editQuestionNote">Edit any question below, then press save. Changes are stored locally and apply directly inside the app.</p>
       <div id="storedQuestionsWrap"><div class="search-results-meta"><strong id="questionResultsCount">0 questions found</strong><span id="questionNoResults" class="hidden">No questions found.</span></div><div id="storedQuestionsList" class="stored-questions question-editor-list"></div></div>
       </div>
-    </section>
+    <section class="card admin-level-card" data-section-key="teacherTest"><div class="section-head"><h2>Archived / Cloned Tests</h2></div><div id="archivedTestsPanel" class="stored-questions"></div></section>
   </div></section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="script.js"></script><script src="custom-classes.js"></script></body></html>

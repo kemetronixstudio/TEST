@@ -1286,3 +1286,222 @@ function isDuplicateQuestionEnhanced(text, list){
     }
   });
 })();
+
+
+/* === v38.9 admin power fix === */
+(function(){
+  function norm(v){ return String(v||'').trim().toLowerCase(); }
+
+  function v389RenderAccounts(){
+    const box = document.getElementById('accessAccountsList');
+    if (!box) return;
+    const extras = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+    const builtIns = (typeof ADMINS !== 'undefined' ? ADMINS : []).map(a => ({
+      user:a.user, pass:a.pass, role:'admin', permissions:(typeof defaultAdminPermissions==='function'?defaultAdminPermissions():[]), builtIn:true
+    }));
+    const all = [...builtIns, ...extras];
+    box.innerHTML = all.length ? all.map((a,idx)=>`
+      <div class="question-edit-card">
+        <div class="meta-line">
+          <span><strong>${escapeHtml(a.user || '')}</strong></span>
+          <span>${escapeHtml(a.role || '')}</span>
+          <span>${escapeHtml((a.permissions||[]).map(permissionLabel).join(', ') || '-')}</span>
+          ${a.builtIn ? '<span>Built-in</span>' : ''}
+        </div>
+        <div class="question-edit-actions">
+          <button class="ghost-btn v389-edit-account" data-user="${escapeHtml(a.user || '')}">Edit</button>
+          <button class="ghost-btn v389-pass-account" data-user="${escapeHtml(a.user || '')}">Password</button>
+          ${a.builtIn ? '' : `<button class="danger-btn v389-del-account" data-user="${escapeHtml(a.user || '')}">${(translations[getLang()]&&translations[getLang()].deleteAccount)||'Delete'}</button>`}
+        </div>
+      </div>
+    `).join('') : `<div class="stored-question"><h4>No extra accounts yet.</h4></div>`;
+
+    box.querySelectorAll('.v389-edit-account').forEach(btn=>{
+      btn.onclick = ()=>{
+        const user = btn.dataset.user;
+        const acc = all.find(a => String(a.user||'').toLowerCase() === user.toLowerCase());
+        if (!acc) return;
+        const u = document.getElementById('accessAccountUser');
+        const p = document.getElementById('accessAccountPass');
+        const r = document.getElementById('accessAccountRole');
+        if (u) u.value = acc.user || '';
+        if (p) p.value = acc.pass || '';
+        if (r) r.value = acc.role || 'user';
+        if (typeof renderAccessPermissions === 'function') renderAccessPermissions(acc.permissions || []);
+      };
+    });
+    box.querySelectorAll('.v389-pass-account').forEach(btn=>{
+      btn.onclick = ()=>{
+        const newPass = prompt(getLang()==='ar' ? 'أدخل كلمة المرور الجديدة' : 'Enter new password');
+        if (!newPass) return;
+        const user = btn.dataset.user;
+        const extrasNow = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+        const idx = extrasNow.findIndex(a => norm(a.user) === norm(user));
+        if (idx >= 0){
+          extrasNow[idx].pass = newPass;
+        } else if (typeof ADMINS !== 'undefined'){
+          const built = ADMINS.find(a => norm(a.user) === norm(user));
+          if (built) extrasNow.push({ user: built.user, pass: newPass, role:'admin', permissions:(typeof defaultAdminPermissions==='function'?defaultAdminPermissions():[]) });
+        }
+        if (typeof setAccessAccounts === 'function') setAccessAccounts(extrasNow);
+        v389RenderAccounts();
+      };
+    });
+    box.querySelectorAll('.v389-del-account').forEach(btn=>{
+      btn.onclick = ()=>{
+        if (!confirm(getLang()==='ar' ? 'هل تريد حذف هذا الحساب؟' : 'Delete this account?')) return;
+        const extrasNow = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+        const next = extrasNow.filter(a => norm(a.user) !== norm(btn.dataset.user));
+        if (typeof setAccessAccounts === 'function') setAccessAccounts(next);
+        v389RenderAccounts();
+      };
+    });
+  }
+
+  function v389SaveUser(){
+    const user = (document.getElementById('accessAccountUser')?.value || '').trim();
+    const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
+    const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
+    if (!user || !pass){
+      alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
+      return;
+    }
+    const permissions = role === 'admin'
+      ? (typeof defaultAdminPermissions === 'function' ? defaultAdminPermissions() : [...PERMISSIONS])
+      : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
+    if (role !== 'admin' && permissions.length === 0){
+      alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
+      return;
+    }
+    const extras = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+    const idx = extras.findIndex(a => norm(a.user) === norm(user));
+    const payload = { user, pass, role, permissions };
+    if (idx >= 0) extras[idx] = payload; else extras.push(payload);
+    if (typeof setAccessAccounts === 'function') setAccessAccounts(extras);
+    const u = document.getElementById('accessAccountUser');
+    const p = document.getElementById('accessAccountPass');
+    const r = document.getElementById('accessAccountRole');
+    if (u) u.value = '';
+    if (p) p.value = '';
+    if (r) r.value = 'user';
+    if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
+    v389RenderAccounts();
+    alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
+  }
+
+  function v389RenderArchivedTests(){
+    const panel = document.getElementById('archivedTestsPanel');
+    if (!panel) return;
+    const archived = (typeof readJson === 'function' && typeof storeKeys !== 'undefined') ? readJson(storeKeys.archivedTeacherTestsV382 || 'archivedTeacherTestsV382', []) : [];
+    panel.innerHTML = archived.length ? archived.map((t,idx)=>`
+      <div class="question-edit-card">
+        <div class="meta-line">
+          <span><strong>${escapeHtml(t.name || 'Test')}</strong></span>
+          <span>${escapeHtml((t.grade || '').toUpperCase())}</span>
+          <span>${t.archived ? 'Archived' : 'Cloned'}</span>
+          <span>${escapeHtml(t.createdAt || '')}</span>
+        </div>
+      </div>
+    `).join('') : `<div class="stored-question"><h4>No archived or cloned tests yet.</h4></div>`;
+  }
+
+  function v389RunSearch(){
+    const wrap = document.getElementById('storedQuestionsWrap');
+    if (!wrap) return;
+    if (typeof renderStoredQuestions === 'function') renderStoredQuestions();
+    const active = (document.querySelector('[data-filter-grade].active')?.dataset.filterGrade || 'all').toLowerCase();
+    const search = (document.getElementById('qSearchInput')?.value || '').toLowerCase().trim();
+    const skill = (document.getElementById('qSkillFilterInput')?.value || '').toLowerCase().trim();
+    const klass = (document.getElementById('qClassFilterInput')?.value || '').toLowerCase().trim();
+    let visible = 0;
+    wrap.querySelectorAll('.question-edit-card').forEach(card=>{
+      const cardGrade = (card.dataset.grade || '').toLowerCase();
+      const text = (card.querySelector('.qe-text')?.value || '').toLowerCase();
+      const qSkill = (card.querySelector('.qe-skill')?.value || '').toLowerCase();
+      const byGrade = active === 'all' || cardGrade === active;
+      const bySearch = !search || text.includes(search);
+      const bySkill = !skill || qSkill.includes(skill);
+      const byClass = !klass || cardGrade.includes(klass);
+      const show = byGrade && bySearch && bySkill && byClass;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    const countEl = document.getElementById('questionResultsCount');
+    const noneEl = document.getElementById('questionNoResults');
+    const statusEl = document.getElementById('questionSearchStatus');
+    if (countEl) countEl.textContent = `${visible} question${visible === 1 ? '' : 's'} found`;
+    if (noneEl) noneEl.classList.toggle('hidden', visible !== 0);
+    if (statusEl) statusEl.textContent = visible ? 'Search results are shown below.' : 'No questions matched your current filters.';
+  }
+
+  function v389BindSearch(){
+    const run = document.getElementById('runQuestionSearchBtn');
+    const clear = document.getElementById('clearQuestionSearchBtn');
+    const showAll = document.getElementById('showAllQuestionsBtn');
+    if (run && !run.dataset.v389){
+      const fresh = run.cloneNode(true);
+      run.parentNode.replaceChild(fresh, run);
+      fresh.dataset.v389 = '1';
+      fresh.onclick = (e)=>{ e.preventDefault(); v389RunSearch(); };
+    }
+    if (clear && !clear.dataset.v389){
+      const fresh = clear.cloneNode(true);
+      clear.parentNode.replaceChild(fresh, clear);
+      fresh.dataset.v389 = '1';
+      fresh.onclick = (e)=>{
+        e.preventDefault();
+        ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id => {
+          const el = document.getElementById(id); if (el) el.value = '';
+        });
+        document.querySelectorAll('[data-filter-grade]').forEach(btn => btn.classList.toggle('active', (btn.dataset.filterGrade || '').toLowerCase()==='all'));
+        v389RunSearch();
+      };
+    }
+    const show = document.getElementById('showAllQuestionsBtn');
+    if (show && !show.dataset.v389){
+      const fresh = show.cloneNode(true);
+      show.parentNode.replaceChild(fresh, show);
+      fresh.dataset.v389 = '1';
+      fresh.onclick = (e)=>{
+        e.preventDefault();
+        if (typeof renderStoredQuestions === 'function') renderStoredQuestions();
+        setTimeout(v389RunSearch, 30);
+      };
+    }
+    ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id=>{
+      const el = document.getElementById(id);
+      if (el && !el.dataset.v389){
+        el.dataset.v389 = '1';
+        el.oninput = ()=> v389RunSearch();
+      }
+    });
+    document.querySelectorAll('[data-filter-grade]').forEach(btn=>{
+      if (btn.dataset.v389) return;
+      btn.dataset.v389 = '1';
+      btn.onclick = (e)=>{ e.preventDefault(); document.querySelectorAll('[data-filter-grade]').forEach(b=>b.classList.toggle('active', b===btn)); v389RunSearch(); };
+    });
+    v389RunSearch();
+  }
+
+  function v389RebindAfterLogin(){
+    const save = document.getElementById('saveAccessAccountBtn');
+    if (save && !save.dataset.v389){
+      const fresh = save.cloneNode(true);
+      save.parentNode.replaceChild(fresh, save);
+      fresh.dataset.v389 = '1';
+      fresh.onclick = (e)=>{ e.preventDefault(); v389SaveUser(); };
+    }
+    v389RenderAccounts();
+    v389BindSearch();
+    v389RenderArchivedTests();
+  }
+
+  window.addEventListener('load', ()=>{
+    setTimeout(v389RebindAfterLogin, 60);
+    const adminBtn = document.getElementById('adminLoginBtn');
+    if (adminBtn && !adminBtn.dataset.v389){
+      adminBtn.dataset.v389 = '1';
+      adminBtn.addEventListener('click', ()=> setTimeout(v389RebindAfterLogin, 180));
+    }
+  });
+})();
