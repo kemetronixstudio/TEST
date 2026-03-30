@@ -974,3 +974,315 @@ function isDuplicateQuestionEnhanced(text, list){
   window.addEventListener('load', ()=> setTimeout(rebindV382, 50));
 })();
 
+
+
+/* === v38.7 user + search fix === */
+(function(){
+  function norm(v){ return String(v||'').trim().toLowerCase(); }
+
+  // reliable save/list for extra accounts
+  window.renderAccessAccountsList = function(){
+    const box = document.getElementById('accessAccountsList');
+    if (!box) return;
+    const accounts = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+    box.innerHTML = accounts.length ? accounts.map((a,idx)=>`
+      <div class="account-card">
+        <div class="meta-line">
+          <span>${escapeHtml(a.user || '')}</span>
+          <span>${escapeHtml(a.role || '')}</span>
+          <span>${escapeHtml((a.permissions||[]).map(permissionLabel).join(', ') || '-')}</span>
+        </div>
+        <div class="account-actions">
+          <button class="ghost-btn edit-access-account" data-idx="${idx}">Edit</button>
+          <button class="ghost-btn delete-access-account" data-idx="${idx}">${(translations[getLang()]&&translations[getLang()].deleteAccount)||'Delete'}</button>
+        </div>
+      </div>
+    `).join('') : `<div class="stored-question"><h4>${(translations[getLang()]&&translations[getLang()].noExtraAccounts)||'No extra accounts yet.'}</h4></div>`;
+
+    box.querySelectorAll('.edit-access-account').forEach(btn=>{
+      btn.onclick = ()=>{
+        const accs = getAccessAccounts();
+        const acc = accs[Number(btn.dataset.idx)];
+        if (!acc) return;
+        const u = document.getElementById('accessAccountUser');
+        const p = document.getElementById('accessAccountPass');
+        const r = document.getElementById('accessAccountRole');
+        if (u) u.value = acc.user || '';
+        if (p) p.value = acc.pass || '';
+        if (r) r.value = acc.role || 'user';
+        if (typeof renderAccessPermissions === 'function') renderAccessPermissions(acc.permissions || []);
+      };
+    });
+    box.querySelectorAll('.delete-access-account').forEach(btn=>{
+      btn.onclick = ()=>{
+        const accs = getAccessAccounts();
+        accs.splice(Number(btn.dataset.idx), 1);
+        if (typeof setAccessAccounts === 'function') setAccessAccounts(accs);
+        renderAccessAccountsList();
+      };
+    });
+  };
+
+  window.saveAccessAccountFromAdmin = function(){
+    try{
+      const user = (document.getElementById('accessAccountUser')?.value || '').trim();
+      const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
+      const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
+      if (!user || !pass){
+        alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
+        return;
+      }
+      const permissions = role === 'admin' ? [...PERMISSIONS] : Array.from(document.querySelectorAll('.perm-check:checked')).map(el=>el.value);
+      if (role !== 'admin' && permissions.length === 0){
+        alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
+        return;
+      }
+      const accs = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+      const idx = accs.findIndex(a => norm(a.user) === norm(user));
+      const payload = { user, pass, role, permissions };
+      if (idx >= 0) accs[idx] = payload; else accs.push(payload);
+      if (typeof setAccessAccounts === 'function') setAccessAccounts(accs);
+      const u = document.getElementById('accessAccountUser');
+      const p = document.getElementById('accessAccountPass');
+      const r = document.getElementById('accessAccountRole');
+      if (u) u.value = '';
+      if (p) p.value = '';
+      if (r) r.value = 'user';
+      if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
+      renderAccessAccountsList();
+      alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
+    }catch(err){
+      alert((translations[getLang()] && translations[getLang()].accountSaveFailed) || 'Could not save account.');
+    }
+  };
+
+  // reliable question search UI
+  const prevFilter = window.filterQuestionCards;
+  window.filterQuestionCards = function(grade){
+    if (typeof prevFilter === 'function') prevFilter(grade);
+    const wrap = document.getElementById('storedQuestionsWrap');
+    if (!wrap) return;
+    const cards = Array.from(wrap.querySelectorAll('.question-edit-card'));
+    const visible = cards.filter(card => card.style.display !== 'none');
+    const countEl = document.getElementById('questionResultsCount');
+    const noneEl = document.getElementById('questionNoResults');
+    const statusEl = document.getElementById('questionSearchStatus');
+    if (countEl) countEl.textContent = `${visible.length} question${visible.length===1?'':'s'} found`;
+    if (noneEl) noneEl.classList.toggle('hidden', visible.length !== 0);
+    if (statusEl) statusEl.textContent = visible.length ? 'Search results are shown below.' : 'No questions matched your current filters.';
+  };
+
+  function runQuestionSearchNow(){
+    const active = (document.querySelector('[data-filter-grade].active')?.dataset.filterGrade || 'all').toLowerCase();
+    const search = (document.getElementById('qSearchInput')?.value || '').toLowerCase().trim();
+    const skill = (document.getElementById('qSkillFilterInput')?.value || '').toLowerCase().trim();
+    const klass = (document.getElementById('qClassFilterInput')?.value || '').toLowerCase().trim();
+    const wrap = document.getElementById('storedQuestionsWrap');
+    if (!wrap) return;
+    wrap.hidden = false;
+    wrap.style.display = '';
+    const cards = wrap.querySelectorAll('.question-edit-card');
+    cards.forEach(card=>{
+      const cardGrade = (card.dataset.grade || '').toLowerCase();
+      const qText = (card.querySelector('.qe-text')?.value || '').toLowerCase();
+      const qSkill = (card.querySelector('.qe-skill')?.value || '').toLowerCase();
+      const byGrade = active === 'all' || cardGrade === active;
+      const bySearch = !search || qText.includes(search);
+      const bySkill = !skill || qSkill.includes(skill);
+      const byClass = !klass || cardGrade.includes(klass);
+      card.style.display = (byGrade && bySearch && bySkill && byClass) ? '' : 'none';
+    });
+    window.filterQuestionCards(active);
+  }
+
+  function clearQuestionSearchNow(){
+    const a = document.getElementById('qSearchInput');
+    const b = document.getElementById('qSkillFilterInput');
+    const c = document.getElementById('qClassFilterInput');
+    if (a) a.value = '';
+    if (b) b.value = '';
+    if (c) c.value = '';
+    document.querySelectorAll('[data-filter-grade]').forEach(btn=>{
+      btn.classList.toggle('active', (btn.dataset.filterGrade || '').toLowerCase() === 'all');
+    });
+    runQuestionSearchNow();
+    const statusEl = document.getElementById('questionSearchStatus');
+    if (statusEl) statusEl.textContent = 'Search results appear below automatically.';
+  }
+
+  function bindV387(){
+    const saveBtn = document.getElementById('saveAccessAccountBtn');
+    if (saveBtn && !saveBtn.dataset.v387){
+      saveBtn.dataset.v387 = '1';
+      saveBtn.onclick = (e)=>{ e.preventDefault(); saveAccessAccountFromAdmin(); };
+    }
+    const runBtn = document.getElementById('runQuestionSearchBtn');
+    if (runBtn && !runBtn.dataset.v387){
+      runBtn.dataset.v387 = '1';
+      runBtn.onclick = (e)=>{ e.preventDefault(); runQuestionSearchNow(); };
+    }
+    const clearBtn = document.getElementById('clearQuestionSearchBtn');
+    if (clearBtn && !clearBtn.dataset.v387){
+      clearBtn.dataset.v387 = '1';
+      clearBtn.onclick = (e)=>{ e.preventDefault(); clearQuestionSearchNow(); };
+    }
+    ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id=>{
+      const el = document.getElementById(id);
+      if (el && !el.dataset.v387){
+        el.dataset.v387 = '1';
+        el.addEventListener('input', runQuestionSearchNow);
+      }
+    });
+    renderAccessAccountsList();
+    runQuestionSearchNow();
+  }
+
+  window.addEventListener('load', ()=> setTimeout(bindV387, 60));
+})();
+
+
+/* === v38.8 real fix for user save + search === */
+(function(){
+  function bindSaveUserV388(){
+    const oldBtn = document.getElementById('saveAccessAccountBtn');
+    if (!oldBtn || oldBtn.dataset.v388 === '1') return;
+    const fresh = oldBtn.cloneNode(true);
+    fresh.dataset.v388 = '1';
+    oldBtn.parentNode.replaceChild(fresh, oldBtn);
+    fresh.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      try{
+        const user = (document.getElementById('accessAccountUser')?.value || '').trim();
+        const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
+        const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
+        if (!user || !pass){
+          alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
+          return;
+        }
+        const permissions = role === 'admin'
+          ? [...PERMISSIONS]
+          : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
+        if (role !== 'admin' && permissions.length === 0){
+          alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
+          return;
+        }
+        const accounts = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+        const idx = accounts.findIndex(a => String(a.user || '').trim().toLowerCase() === user.toLowerCase());
+        const payload = { user, pass, role, permissions };
+        if (idx >= 0) accounts[idx] = payload; else accounts.push(payload);
+        if (typeof setAccessAccounts === 'function') setAccessAccounts(accounts);
+        const u = document.getElementById('accessAccountUser');
+        const p = document.getElementById('accessAccountPass');
+        const r = document.getElementById('accessAccountRole');
+        if (u) u.value = '';
+        if (p) p.value = '';
+        if (r) r.value = 'user';
+        if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
+        if (typeof renderAccessAccountsList === 'function') renderAccessAccountsList();
+        alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
+      }catch(err){
+        alert((translations[getLang()] && translations[getLang()].accountSaveFailed) || 'Could not save account.');
+      }
+    });
+  }
+
+  function bindSearchV388(){
+    const runBtn = document.getElementById('runQuestionSearchBtn');
+    const clearBtn = document.getElementById('clearQuestionSearchBtn');
+
+    function doSearch(){
+      try{
+        if (typeof renderStoredQuestions === 'function') renderStoredQuestions();
+      }catch(e){}
+      const active = (document.querySelector('[data-filter-grade].active')?.dataset.filterGrade || 'all').toLowerCase();
+      const search = (document.getElementById('qSearchInput')?.value || '').toLowerCase().trim();
+      const skill = (document.getElementById('qSkillFilterInput')?.value || '').toLowerCase().trim();
+      const klass = (document.getElementById('qClassFilterInput')?.value || '').toLowerCase().trim();
+      const wrap = document.getElementById('storedQuestionsWrap');
+      if (!wrap) return;
+      const cards = wrap.querySelectorAll('.question-edit-card');
+      let visible = 0;
+      cards.forEach(card => {
+        const cardGrade = (card.dataset.grade || '').toLowerCase();
+        const qText = (card.querySelector('.qe-text')?.value || '').toLowerCase();
+        const qSkill = (card.querySelector('.qe-skill')?.value || '').toLowerCase();
+        const byGrade = active === 'all' || cardGrade === active;
+        const bySearch = !search || qText.includes(search);
+        const bySkill = !skill || qSkill.includes(skill);
+        const byClass = !klass || cardGrade.includes(klass);
+        const show = byGrade && bySearch && bySkill && byClass;
+        card.style.display = show ? '' : 'none';
+        if (show) visible += 1;
+      });
+      const countEl = document.getElementById('questionResultsCount');
+      const noneEl = document.getElementById('questionNoResults');
+      const statusEl = document.getElementById('questionSearchStatus');
+      if (countEl) countEl.textContent = `${visible} question${visible === 1 ? '' : 's'} found`;
+      if (noneEl) noneEl.classList.toggle('hidden', visible !== 0);
+      if (statusEl) statusEl.textContent = visible ? 'Search results are shown below.' : 'No questions matched your current filters.';
+    }
+
+    function clearSearch(){
+      const a = document.getElementById('qSearchInput');
+      const b = document.getElementById('qSkillFilterInput');
+      const c = document.getElementById('qClassFilterInput');
+      if (a) a.value = '';
+      if (b) b.value = '';
+      if (c) c.value = '';
+      document.querySelectorAll('[data-filter-grade]').forEach(btn => {
+        btn.classList.toggle('active', (btn.dataset.filterGrade || '').toLowerCase() === 'all');
+      });
+      doSearch();
+      const statusEl = document.getElementById('questionSearchStatus');
+      if (statusEl) statusEl.textContent = 'Search results appear below automatically.';
+    }
+
+    if (runBtn && !runBtn.dataset.v388){
+      runBtn.dataset.v388 = '1';
+      const fresh = runBtn.cloneNode(true);
+      runBtn.parentNode.replaceChild(fresh, runBtn);
+      fresh.dataset.v388 = '1';
+      fresh.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); doSearch(); });
+    }
+    const freshRun = document.getElementById('runQuestionSearchBtn');
+    if (clearBtn && !clearBtn.dataset.v388){
+      const fresh = clearBtn.cloneNode(true);
+      clearBtn.parentNode.replaceChild(fresh, clearBtn);
+      fresh.dataset.v388 = '1';
+      fresh.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); clearSearch(); });
+    }
+    ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.v388){
+        el.dataset.v388 = '1';
+        el.addEventListener('input', doSearch);
+      }
+    });
+    document.querySelectorAll('[data-filter-grade]').forEach(btn => {
+      if (btn.dataset.v388) return;
+      btn.dataset.v388 = '1';
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        document.querySelectorAll('[data-filter-grade]').forEach(b => b.classList.toggle('active', b === btn));
+        doSearch();
+      });
+    });
+    doSearch();
+  }
+
+  function bindAfterAdminOpenV388(){
+    bindSaveUserV388();
+    bindSearchV388();
+    try{ if (typeof renderAccessAccountsList === 'function') renderAccessAccountsList(); }catch(e){}
+  }
+
+  window.addEventListener('load', function(){
+    setTimeout(bindAfterAdminOpenV388, 80);
+    const adminBtn = document.getElementById('adminLoginBtn');
+    if (adminBtn && !adminBtn.dataset.v388hook){
+      adminBtn.dataset.v388hook = '1';
+      adminBtn.addEventListener('click', function(){ setTimeout(bindAfterAdminOpenV388, 120); });
+    }
+  });
+})();

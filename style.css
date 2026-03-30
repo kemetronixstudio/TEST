@@ -460,3 +460,10 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
   width:100% !important;
   height:100% !important;
 }
+
+
+/* v38.7 user search fix */
+.v384-search-tools{margin-top:10px;align-items:center}
+.search-results-note{color:#5d718d;font-size:.92rem}
+.search-results-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
+#questionNoResults{color:#e55252;font-weight:700}
