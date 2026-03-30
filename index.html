@@ -1,0 +1,28 @@
+
+<!doctype html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KG Pro Quiz</title><link rel="stylesheet" href="style.css">
+</head><body data-page="home">
+<div class="page">
+  <div class="topbar">
+    <a class="ghost-btn home-link" href="admin.html" data-i18n="admin">Admin</a>
+    <div class="teacher" data-i18n="teacher">Dr. TAREK ABDALAZIZ 📞 01032188008</div>
+    <div class="lang"><button class="active" id="langEn">EN</button><button id="langAr">AR</button></div>
+  </div>
+  <div class="card hero">
+    <div class="badge">PRO V39</div>
+    <h1 id="homeTitle">English Quiz Platform</h1>
+    <p id="homeLead">Choose a class and start a beautiful, stable quiz experience.</p>
+    <div class="level-grid" id="levelGrid"></div>
+  </div>
+</div>
+<script type="module">
+import { setLang, getLang } from './ui.js';
+import { initHome } from './core.js';
+document.getElementById('langEn').onclick=()=>{setLang('en');location.reload();};
+document.getElementById('langAr').onclick=()=>{setLang('ar');location.reload();};
+if(getLang()==='ar'){document.getElementById('langAr').classList.add('active');document.getElementById('langEn').classList.remove('active');}
+initHome();
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js').catch(()=>{}); }
+</script>
+</body></html>

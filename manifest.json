@@ -1,0 +1,9 @@
+{
+  "name": "KG Pro Quiz",
+  "short_name": "KG Pro",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fff8df",
+  "theme_color": "#4b8cff",
+  "icons": []
+}

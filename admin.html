@@ -1,0 +1,148 @@
+
+<!doctype html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin</title><link rel="stylesheet" href="style.css">
+</head><body data-page="admin">
+<div class="page wrap">
+  <div class="topbar">
+    <a class="ghost-btn home-link" href="index.html" data-i18n="home">Home</a>
+    <div class="teacher" data-i18n="teacher">Dr. TAREK ABDALAZIZ 📞 01032188008</div>
+    <div class="lang"><button class="active" id="langEn">EN</button><button id="langAr">AR</button></div>
+  </div>
+
+  <div id="loginCard" class="card">
+    <h2 data-i18n="admin">Admin</h2>
+    <div class="form-grid">
+      <input id="adminUser" placeholder="Admin name">
+      <input id="adminPass" placeholder="Password" type="password">
+    </div>
+    <div class="actions"><button class="main-btn" id="adminLoginBtn">Open Dashboard</button></div>
+  </div>
+
+  <div id="adminPanel" class="hidden wrap">
+    <section class="card" data-section="users">
+      <div class="section-head"><h2 data-i18n="users">Users & Roles</h2></div>
+      <div class="form-grid full-3">
+        <input id="accUser" placeholder="Username">
+        <input id="accPass" placeholder="Password">
+        <select id="accRole"><option value="user">Staff</option><option value="admin">Admin</option></select>
+      </div>
+      <div id="permWrap" class="toolbar"></div>
+      <div class="actions"><button class="main-btn" id="saveAccountBtn">Save Account</button></div>
+      <div class="section-head sub-head"><h3 data-i18n="existingAccounts">Existing Accounts</h3></div>
+      <div id="accountsList" class="wrap"></div>
+    </section>
+
+    <section class="card" data-section="classes">
+      <div class="section-head"><h2 data-i18n="classes">Classes</h2></div>
+      <input type="hidden" id="classEditKey">
+      <div class="form-grid full-3">
+        <input id="className" placeholder="Class name">
+        <input id="classDesc" placeholder="Description">
+        <label class="pill"><input type="checkbox" id="classHidden"> <span data-i18n="hideClass">Hide class from main page</span></label>
+      </div>
+      <div class="actions"><button class="main-btn" id="saveClassBtn">Save Class</button></div>
+      <div id="classList" class="wrap"></div>
+    </section>
+
+    <section class="card" data-section="questions">
+      <div class="section-head"><h2 data-i18n="questions">Question Bank</h2><button class="ghost-btn" id="toggleQuestionBankEditorBtn">Collapse</button></div>
+      <div id="questionBankEditorBody" class="collapse-body">
+        <div class="form-grid full-3">
+          <select id="qGrade"></select>
+          <select id="qType">
+            <option value="choice">choice</option>
+            <option value="true_false">true/false</option>
+            <option value="input">type missing letter</option>
+            <option value="reorder">reorder letters</option>
+            <option value="match">match image to word</option>
+            <option value="listen">listen and choose</option>
+          </select>
+          <input id="qSkill" placeholder="Skill">
+        </div>
+        <div class="form-grid">
+          <input id="qText" placeholder="Question text">
+          <input id="qAnswer" placeholder="Correct answer">
+        </div>
+        <div class="form-grid">
+          <input id="qOptions" placeholder="Options separated by |">
+          <input id="qImage" placeholder="Image file name (optional)">
+        </div>
+        <div class="actions">
+          <button class="ghost-btn" id="previewQuestionBtn" data-i18n="preview">Preview</button>
+          <button class="main-btn" id="saveQuestionBtn">Save Question</button>
+        </div>
+
+        <div class="section-head sub-head"><h3>Search & Filters</h3></div>
+        <div class="toolbar question-filter-row">
+          <input id="qSearch" data-ph="search" placeholder="Search">
+          <select id="qSkillFilter">
+            <option value="all">All Skills</option>
+            <option value="vocabulary">Vocabulary</option>
+            <option value="grammar">Grammar</option>
+            <option value="phonics">Phonics</option>
+            <option value="listening">Listening</option>
+            <option value="spelling">Spelling</option>
+            <option value="shapes">Shapes</option>
+            <option value="numbers">Numbers</option>
+            <option value="body">Body</option>
+            <option value="colors">Colors</option>
+            <option value="manners">Manners</option>
+          </select>
+          <select id="qClassFilter"></select>
+        </div>
+        <div id="questionsList" class="wrap"></div>
+      </div>
+    </section>
+
+    <section class="card" data-section="tests">
+      <div class="section-head"><h2 data-i18n="tests">Tests</h2></div>
+      <div class="form-grid full-3">
+        <select id="testGrade"></select>
+        <input id="testName" placeholder="Test name">
+        <input id="testCount" type="number" value="10" placeholder="Question count">
+      </div>
+      <div class="form-grid">
+        <textarea id="testQuestions" placeholder="Question texts, one per line"></textarea>
+        <div class="wrap">
+          <div class="notice">Use exact question texts line by line for a manual test.</div>
+          <div class="toolbar">
+            <select id="cloneFrom"></select>
+            <select id="cloneTo"></select>
+          </div>
+          <div class="actions">
+            <button class="main-btn" id="saveTestBtn">Save Test</button>
+            <button class="ghost-btn" id="cloneQuizBtn" data-i18n="cloneQuiz">Clone Quiz</button>
+            <button class="danger-btn" id="archiveTestBtn" data-i18n="archive">Archive</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" data-section="bulk">
+      <div class="section-head"><h2 data-i18n="bulk">Bulk Import</h2></div>
+      <div class="actions">
+        <button class="ghost-btn" id="downloadTemplateBtn">Download CSV Template</button>
+        <input type="file" id="bulkFile" accept=".csv">
+      </div>
+      <div id="bulkReport" class="wrap"></div>
+    </section>
+  </div>
+</div>
+
+<div id="previewModal" class="modal hidden">
+  <div class="card modal-card">
+    <div class="section-head"><h3 data-i18n="preview">Preview</h3><button class="ghost-btn" id="closePreviewBtn">Close</button></div>
+    <div id="previewBody"></div>
+  </div>
+</div>
+
+<script type="module">
+import { setLang, getLang } from './ui.js';
+import { initAdmin } from './admin.js';
+document.getElementById('langEn').onclick=()=>{setLang('en');location.reload();};
+document.getElementById('langAr').onclick=()=>{setLang('ar');location.reload();};
+if(getLang()==='ar'){document.getElementById('langAr').classList.add('active');document.getElementById('langEn').classList.remove('active');}
+initAdmin();
+</script>
+</body></html>
