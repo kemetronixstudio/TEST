@@ -976,33 +976,121 @@ function isDuplicateQuestionEnhanced(text, list){
 
 
 
-/* === v38.7 user + search fix === */
+/* === v38 pro account system === */
 (function(){
-  function norm(v){ return String(v||'').trim().toLowerCase(); }
+  const PRO_ACCOUNT_KEY = 'kg_pro_accounts_v1';
 
-  // reliable save/list for extra accounts
+  function accNorm(v){
+    return String(v || '').trim().toLowerCase();
+  }
+
+  function builtInAdminsPro(){
+    const perms = (typeof defaultAdminPermissions === 'function')
+      ? defaultAdminPermissions()
+      : (Array.isArray(PERMISSIONS) ? [...PERMISSIONS] : []);
+    const admins = (typeof ADMINS !== 'undefined' && Array.isArray(ADMINS)) ? ADMINS : [
+      { user:'Dr. Tarek', pass:'T01032188008' },
+      { user:'HITMAN', pass:'01002439054' }
+    ];
+    return admins.map(a => ({
+      user: a.user,
+      pass: a.pass,
+      role: 'admin',
+      permissions: perms,
+      builtIn: true
+    }));
+  }
+
+  function accGetStored(){
+    try{
+      const a = JSON.parse(localStorage.getItem(PRO_ACCOUNT_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    }catch(e){
+      return [];
+    }
+  }
+
+  function accSetStored(list){
+    localStorage.setItem(PRO_ACCOUNT_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+    // also mirror to existing app storage when available
+    try{
+      if (typeof setAccessAccounts === 'function') setAccessAccounts(list);
+    }catch(e){}
+  }
+
+  function accGetAllEditable(){
+    // prefer the new store; if empty, migrate old store once
+    let list = accGetStored();
+    if (!list.length){
+      try{
+        const old = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+        if (Array.isArray(old) && old.length){
+          list = old.map(a => ({
+            user: a.user || a.username || '',
+            pass: a.pass || a.password || '',
+            role: a.role || 'user',
+            permissions: Array.isArray(a.permissions) ? a.permissions : []
+          }));
+          accSetStored(list);
+        }
+      }catch(e){}
+    }
+    return list;
+  }
+
+  function accPermissionText(acc){
+    if ((acc.role || '') === 'admin') return 'All permissions';
+    const perms = Array.isArray(acc.permissions) ? acc.permissions : [];
+    return perms.length ? perms.map(p => (typeof permissionLabel === 'function' ? permissionLabel(p) : p)).join(', ') : '-';
+  }
+
+  window.getLoginAccount = function(user, pass){
+    const u = accNorm(user);
+    const p = String(pass || '').trim();
+
+    const built = builtInAdminsPro().find(a => accNorm(a.user) === u);
+    if (built && built.pass === p){
+      return { user: built.user, role: built.role, permissions: built.permissions, builtIn: true };
+    }
+
+    const editable = accGetAllEditable();
+    const match = editable.find(a => accNorm(a.user) === u && String(a.pass || '').trim() === p);
+    return match ? { ...match, builtIn: false } : null;
+  };
+
   window.renderAccessAccountsList = function(){
     const box = document.getElementById('accessAccountsList');
     if (!box) return;
-    const accounts = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
-    box.innerHTML = accounts.length ? accounts.map((a,idx)=>`
-      <div class="account-card">
+
+    const built = builtInAdminsPro();
+    const editable = accGetAllEditable();
+    const all = [...built, ...editable.map(a => ({...a, builtIn:false}))];
+
+    if (!all.length){
+      box.innerHTML = '<div class="stored-question"><h4>No accounts yet.</h4></div>';
+      return;
+    }
+
+    box.innerHTML = all.map((acc, i) => `
+      <div class="question-edit-card">
         <div class="meta-line">
-          <span>${escapeHtml(a.user || '')}</span>
-          <span>${escapeHtml(a.role || '')}</span>
-          <span>${escapeHtml((a.permissions||[]).map(permissionLabel).join(', ') || '-')}</span>
+          <span><strong>${escapeHtml(acc.user || '')}</strong></span>
+          <span>${escapeHtml(acc.role || '')}</span>
+          ${acc.builtIn ? '<span>Built-in</span>' : '<span>Saved</span>'}
         </div>
-        <div class="account-actions">
-          <button class="ghost-btn edit-access-account" data-idx="${idx}">Edit</button>
-          <button class="ghost-btn delete-access-account" data-idx="${idx}">${(translations[getLang()]&&translations[getLang()].deleteAccount)||'Delete'}</button>
+        <div class="perm-list">${escapeHtml(accPermissionText(acc))}</div>
+        <div class="question-edit-actions">
+          <button class="ghost-btn pro-acc-edit" data-user="${escapeHtml(acc.user || '')}">Edit</button>
+          <button class="ghost-btn pro-acc-pass" data-user="${escapeHtml(acc.user || '')}">Change Password</button>
+          ${acc.builtIn ? '' : `<button class="danger-btn pro-acc-del" data-user="${escapeHtml(acc.user || '')}">Delete</button>`}
         </div>
       </div>
-    `).join('') : `<div class="stored-question"><h4>${(translations[getLang()]&&translations[getLang()].noExtraAccounts)||'No extra accounts yet.'}</h4></div>`;
+    `).join('');
 
-    box.querySelectorAll('.edit-access-account').forEach(btn=>{
-      btn.onclick = ()=>{
-        const accs = getAccessAccounts();
-        const acc = accs[Number(btn.dataset.idx)];
+    box.querySelectorAll('.pro-acc-edit').forEach(btn => {
+      btn.onclick = () => {
+        const user = btn.dataset.user || '';
+        const acc = all.find(a => accNorm(a.user) === accNorm(user));
         if (!acc) return;
         const u = document.getElementById('accessAccountUser');
         const p = document.getElementById('accessAccountPass');
@@ -1013,746 +1101,107 @@ function isDuplicateQuestionEnhanced(text, list){
         if (typeof renderAccessPermissions === 'function') renderAccessPermissions(acc.permissions || []);
       };
     });
-    box.querySelectorAll('.delete-access-account').forEach(btn=>{
-      btn.onclick = ()=>{
-        const accs = getAccessAccounts();
-        accs.splice(Number(btn.dataset.idx), 1);
-        if (typeof setAccessAccounts === 'function') setAccessAccounts(accs);
+
+    box.querySelectorAll('.pro-acc-pass').forEach(btn => {
+      btn.onclick = () => {
+        const user = btn.dataset.user || '';
+        const next = prompt((typeof getLang === 'function' && getLang() === 'ar') ? 'أدخل كلمة المرور الجديدة' : 'Enter new password');
+        if (!next) return;
+        const editable = accGetAllEditable();
+        const idx = editable.findIndex(a => accNorm(a.user) === accNorm(user));
+        if (idx >= 0){
+          editable[idx].pass = next;
+          accSetStored(editable);
+        } else {
+          const built = builtInAdminsPro().find(a => accNorm(a.user) === accNorm(user));
+          if (built){
+            editable.push({
+              user: built.user,
+              pass: next,
+              role: 'admin',
+              permissions: built.permissions || []
+            });
+            accSetStored(editable);
+          }
+        }
         renderAccessAccountsList();
+        alert((typeof getLang === 'function' && getLang() === 'ar') ? 'تم تحديث كلمة المرور.' : 'Password updated.');
+      };
+    });
+
+    box.querySelectorAll('.pro-acc-del').forEach(btn => {
+      btn.onclick = () => {
+        if (!confirm((typeof getLang === 'function' && getLang() === 'ar') ? 'هل تريد حذف هذا الحساب؟' : 'Delete this account?')) return;
+        const next = accGetAllEditable().filter(a => accNorm(a.user) !== accNorm(btn.dataset.user || ''));
+        accSetStored(next);
+        renderAccessAccountsList();
+        alert((typeof getLang === 'function' && getLang() === 'ar') ? 'تم حذف الحساب.' : 'Account deleted.');
       };
     });
   };
 
   window.saveAccessAccountFromAdmin = function(){
-    try{
-      const user = (document.getElementById('accessAccountUser')?.value || '').trim();
-      const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
-      const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
-      if (!user || !pass){
-        alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
-        return;
-      }
-      const permissions = role === 'admin' ? [...PERMISSIONS] : Array.from(document.querySelectorAll('.perm-check:checked')).map(el=>el.value);
-      if (role !== 'admin' && permissions.length === 0){
-        alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
-        return;
-      }
-      const accs = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
-      const idx = accs.findIndex(a => norm(a.user) === norm(user));
-      const payload = { user, pass, role, permissions };
-      if (idx >= 0) accs[idx] = payload; else accs.push(payload);
-      if (typeof setAccessAccounts === 'function') setAccessAccounts(accs);
-      const u = document.getElementById('accessAccountUser');
-      const p = document.getElementById('accessAccountPass');
-      const r = document.getElementById('accessAccountRole');
-      if (u) u.value = '';
-      if (p) p.value = '';
-      if (r) r.value = 'user';
-      if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
-      renderAccessAccountsList();
-      alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
-    }catch(err){
-      alert((translations[getLang()] && translations[getLang()].accountSaveFailed) || 'Could not save account.');
-    }
-  };
+    const user = (document.getElementById('accessAccountUser')?.value || '').trim();
+    const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
+    const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
 
-  // reliable question search UI
-  const prevFilter = window.filterQuestionCards;
-  window.filterQuestionCards = function(grade){
-    if (typeof prevFilter === 'function') prevFilter(grade);
-    const wrap = document.getElementById('storedQuestionsWrap');
-    if (!wrap) return;
-    const cards = Array.from(wrap.querySelectorAll('.question-edit-card'));
-    const visible = cards.filter(card => card.style.display !== 'none');
-    const countEl = document.getElementById('questionResultsCount');
-    const noneEl = document.getElementById('questionNoResults');
-    const statusEl = document.getElementById('questionSearchStatus');
-    if (countEl) countEl.textContent = `${visible.length} question${visible.length===1?'':'s'} found`;
-    if (noneEl) noneEl.classList.toggle('hidden', visible.length !== 0);
-    if (statusEl) statusEl.textContent = visible.length ? 'Search results are shown below.' : 'No questions matched your current filters.';
-  };
-
-  function runQuestionSearchNow(){
-    const active = (document.querySelector('[data-filter-grade].active')?.dataset.filterGrade || 'all').toLowerCase();
-    const search = (document.getElementById('qSearchInput')?.value || '').toLowerCase().trim();
-    const skill = (document.getElementById('qSkillFilterInput')?.value || '').toLowerCase().trim();
-    const klass = (document.getElementById('qClassFilterInput')?.value || '').toLowerCase().trim();
-    const wrap = document.getElementById('storedQuestionsWrap');
-    if (!wrap) return;
-    wrap.hidden = false;
-    wrap.style.display = '';
-    const cards = wrap.querySelectorAll('.question-edit-card');
-    cards.forEach(card=>{
-      const cardGrade = (card.dataset.grade || '').toLowerCase();
-      const qText = (card.querySelector('.qe-text')?.value || '').toLowerCase();
-      const qSkill = (card.querySelector('.qe-skill')?.value || '').toLowerCase();
-      const byGrade = active === 'all' || cardGrade === active;
-      const bySearch = !search || qText.includes(search);
-      const bySkill = !skill || qSkill.includes(skill);
-      const byClass = !klass || cardGrade.includes(klass);
-      card.style.display = (byGrade && bySearch && bySkill && byClass) ? '' : 'none';
-    });
-    window.filterQuestionCards(active);
-  }
-
-  function clearQuestionSearchNow(){
-    const a = document.getElementById('qSearchInput');
-    const b = document.getElementById('qSkillFilterInput');
-    const c = document.getElementById('qClassFilterInput');
-    if (a) a.value = '';
-    if (b) b.value = '';
-    if (c) c.value = '';
-    document.querySelectorAll('[data-filter-grade]').forEach(btn=>{
-      btn.classList.toggle('active', (btn.dataset.filterGrade || '').toLowerCase() === 'all');
-    });
-    runQuestionSearchNow();
-    const statusEl = document.getElementById('questionSearchStatus');
-    if (statusEl) statusEl.textContent = 'Search results appear below automatically.';
-  }
-
-  function bindV387(){
-    const saveBtn = document.getElementById('saveAccessAccountBtn');
-    if (saveBtn && !saveBtn.dataset.v387){
-      saveBtn.dataset.v387 = '1';
-      saveBtn.onclick = (e)=>{ e.preventDefault(); saveAccessAccountFromAdmin(); };
+    if (!user || !pass){
+      alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
+      return;
     }
-    const runBtn = document.getElementById('runQuestionSearchBtn');
-    if (runBtn && !runBtn.dataset.v387){
-      runBtn.dataset.v387 = '1';
-      runBtn.onclick = (e)=>{ e.preventDefault(); runQuestionSearchNow(); };
+
+    const permissions = role === 'admin'
+      ? ((typeof defaultAdminPermissions === 'function') ? defaultAdminPermissions() : [...PERMISSIONS])
+      : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
+
+    if (role !== 'admin' && permissions.length === 0){
+      alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
+      return;
     }
-    const clearBtn = document.getElementById('clearQuestionSearchBtn');
-    if (clearBtn && !clearBtn.dataset.v387){
-      clearBtn.dataset.v387 = '1';
-      clearBtn.onclick = (e)=>{ e.preventDefault(); clearQuestionSearchNow(); };
-    }
-    ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id=>{
-      const el = document.getElementById(id);
-      if (el && !el.dataset.v387){
-        el.dataset.v387 = '1';
-        el.addEventListener('input', runQuestionSearchNow);
-      }
-    });
+
+    const list = accGetAllEditable();
+    const idx = list.findIndex(a => accNorm(a.user) === accNorm(user));
+    const payload = { user, pass, role, permissions };
+
+    if (idx >= 0) list[idx] = payload;
+    else list.push(payload);
+
+    accSetStored(list);
+
+    const u = document.getElementById('accessAccountUser');
+    const p = document.getElementById('accessAccountPass');
+    const r = document.getElementById('accessAccountRole');
+    if (u) u.value = '';
+    if (p) p.value = '';
+    if (r) r.value = 'user';
+    if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
+
     renderAccessAccountsList();
-    runQuestionSearchNow();
-  }
-
-  window.addEventListener('load', ()=> setTimeout(bindV387, 60));
-})();
-
-
-/* === v38.8 real fix for user save + search === */
-(function(){
-  function bindSaveUserV388(){
-    const oldBtn = document.getElementById('saveAccessAccountBtn');
-    if (!oldBtn || oldBtn.dataset.v388 === '1') return;
-    const fresh = oldBtn.cloneNode(true);
-    fresh.dataset.v388 = '1';
-    oldBtn.parentNode.replaceChild(fresh, oldBtn);
-    fresh.addEventListener('click', function(e){
-      e.preventDefault();
-      e.stopPropagation();
-      try{
-        const user = (document.getElementById('accessAccountUser')?.value || '').trim();
-        const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
-        const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
-        if (!user || !pass){
-          alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
-          return;
-        }
-        const permissions = role === 'admin'
-          ? [...PERMISSIONS]
-          : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
-        if (role !== 'admin' && permissions.length === 0){
-          alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
-          return;
-        }
-        const accounts = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
-        const idx = accounts.findIndex(a => String(a.user || '').trim().toLowerCase() === user.toLowerCase());
-        const payload = { user, pass, role, permissions };
-        if (idx >= 0) accounts[idx] = payload; else accounts.push(payload);
-        if (typeof setAccessAccounts === 'function') setAccessAccounts(accounts);
-        const u = document.getElementById('accessAccountUser');
-        const p = document.getElementById('accessAccountPass');
-        const r = document.getElementById('accessAccountRole');
-        if (u) u.value = '';
-        if (p) p.value = '';
-        if (r) r.value = 'user';
-        if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
-        if (typeof renderAccessAccountsList === 'function') renderAccessAccountsList();
-        alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
-      }catch(err){
-        alert((translations[getLang()] && translations[getLang()].accountSaveFailed) || 'Could not save account.');
-      }
-    });
-  }
-
-  function bindSearchV388(){
-    const runBtn = document.getElementById('runQuestionSearchBtn');
-    const clearBtn = document.getElementById('clearQuestionSearchBtn');
-
-    function doSearch(){
-      try{
-        if (typeof renderStoredQuestions === 'function') renderStoredQuestions();
-      }catch(e){}
-      const active = (document.querySelector('[data-filter-grade].active')?.dataset.filterGrade || 'all').toLowerCase();
-      const search = (document.getElementById('qSearchInput')?.value || '').toLowerCase().trim();
-      const skill = (document.getElementById('qSkillFilterInput')?.value || '').toLowerCase().trim();
-      const klass = (document.getElementById('qClassFilterInput')?.value || '').toLowerCase().trim();
-      const wrap = document.getElementById('storedQuestionsWrap');
-      if (!wrap) return;
-      const cards = wrap.querySelectorAll('.question-edit-card');
-      let visible = 0;
-      cards.forEach(card => {
-        const cardGrade = (card.dataset.grade || '').toLowerCase();
-        const qText = (card.querySelector('.qe-text')?.value || '').toLowerCase();
-        const qSkill = (card.querySelector('.qe-skill')?.value || '').toLowerCase();
-        const byGrade = active === 'all' || cardGrade === active;
-        const bySearch = !search || qText.includes(search);
-        const bySkill = !skill || qSkill.includes(skill);
-        const byClass = !klass || cardGrade.includes(klass);
-        const show = byGrade && bySearch && bySkill && byClass;
-        card.style.display = show ? '' : 'none';
-        if (show) visible += 1;
-      });
-      const countEl = document.getElementById('questionResultsCount');
-      const noneEl = document.getElementById('questionNoResults');
-      const statusEl = document.getElementById('questionSearchStatus');
-      if (countEl) countEl.textContent = `${visible} question${visible === 1 ? '' : 's'} found`;
-      if (noneEl) noneEl.classList.toggle('hidden', visible !== 0);
-      if (statusEl) statusEl.textContent = visible ? 'Search results are shown below.' : 'No questions matched your current filters.';
-    }
-
-    function clearSearch(){
-      const a = document.getElementById('qSearchInput');
-      const b = document.getElementById('qSkillFilterInput');
-      const c = document.getElementById('qClassFilterInput');
-      if (a) a.value = '';
-      if (b) b.value = '';
-      if (c) c.value = '';
-      document.querySelectorAll('[data-filter-grade]').forEach(btn => {
-        btn.classList.toggle('active', (btn.dataset.filterGrade || '').toLowerCase() === 'all');
-      });
-      doSearch();
-      const statusEl = document.getElementById('questionSearchStatus');
-      if (statusEl) statusEl.textContent = 'Search results appear below automatically.';
-    }
-
-    if (runBtn && !runBtn.dataset.v388){
-      runBtn.dataset.v388 = '1';
-      const fresh = runBtn.cloneNode(true);
-      runBtn.parentNode.replaceChild(fresh, runBtn);
-      fresh.dataset.v388 = '1';
-      fresh.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); doSearch(); });
-    }
-    const freshRun = document.getElementById('runQuestionSearchBtn');
-    if (clearBtn && !clearBtn.dataset.v388){
-      const fresh = clearBtn.cloneNode(true);
-      clearBtn.parentNode.replaceChild(fresh, clearBtn);
-      fresh.dataset.v388 = '1';
-      fresh.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); clearSearch(); });
-    }
-    ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el && !el.dataset.v388){
-        el.dataset.v388 = '1';
-        el.addEventListener('input', doSearch);
-      }
-    });
-    document.querySelectorAll('[data-filter-grade]').forEach(btn => {
-      if (btn.dataset.v388) return;
-      btn.dataset.v388 = '1';
-      btn.addEventListener('click', function(e){
-        e.preventDefault();
-        document.querySelectorAll('[data-filter-grade]').forEach(b => b.classList.toggle('active', b === btn));
-        doSearch();
-      });
-    });
-    doSearch();
-  }
-
-  function bindAfterAdminOpenV388(){
-    bindSaveUserV388();
-    bindSearchV388();
-    try{ if (typeof renderAccessAccountsList === 'function') renderAccessAccountsList(); }catch(e){}
-  }
-
-  window.addEventListener('load', function(){
-    setTimeout(bindAfterAdminOpenV388, 80);
-    const adminBtn = document.getElementById('adminLoginBtn');
-    if (adminBtn && !adminBtn.dataset.v388hook){
-      adminBtn.dataset.v388hook = '1';
-      adminBtn.addEventListener('click', function(){ setTimeout(bindAfterAdminOpenV388, 120); });
-    }
-  });
-})();
-
-
-/* === v38.9 admin power fix === */
-(function(){
-  function norm(v){ return String(v||'').trim().toLowerCase(); }
-
-  function v389RenderAccounts(){
-    const box = document.getElementById('accessAccountsList');
-    if (!box) return;
-    const extras = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
-    const builtIns = (typeof ADMINS !== 'undefined' ? ADMINS : []).map(a => ({
-      user:a.user, pass:a.pass, role:'admin', permissions:(typeof defaultAdminPermissions==='function'?defaultAdminPermissions():[]), builtIn:true
-    }));
-    const all = [...builtIns, ...extras];
-    box.innerHTML = all.length ? all.map((a,idx)=>`
-      <div class="question-edit-card">
-        <div class="meta-line">
-          <span><strong>${escapeHtml(a.user || '')}</strong></span>
-          <span>${escapeHtml(a.role || '')}</span>
-          <span>${escapeHtml((a.permissions||[]).map(permissionLabel).join(', ') || '-')}</span>
-          ${a.builtIn ? '<span>Built-in</span>' : ''}
-        </div>
-        <div class="question-edit-actions">
-          <button class="ghost-btn v389-edit-account" data-user="${escapeHtml(a.user || '')}">Edit</button>
-          <button class="ghost-btn v389-pass-account" data-user="${escapeHtml(a.user || '')}">Password</button>
-          ${a.builtIn ? '' : `<button class="danger-btn v389-del-account" data-user="${escapeHtml(a.user || '')}">${(translations[getLang()]&&translations[getLang()].deleteAccount)||'Delete'}</button>`}
-        </div>
-      </div>
-    `).join('') : `<div class="stored-question"><h4>No extra accounts yet.</h4></div>`;
-
-    box.querySelectorAll('.v389-edit-account').forEach(btn=>{
-      btn.onclick = ()=>{
-        const user = btn.dataset.user;
-        const acc = all.find(a => String(a.user||'').toLowerCase() === user.toLowerCase());
-        if (!acc) return;
-        const u = document.getElementById('accessAccountUser');
-        const p = document.getElementById('accessAccountPass');
-        const r = document.getElementById('accessAccountRole');
-        if (u) u.value = acc.user || '';
-        if (p) p.value = acc.pass || '';
-        if (r) r.value = acc.role || 'user';
-        if (typeof renderAccessPermissions === 'function') renderAccessPermissions(acc.permissions || []);
-      };
-    });
-    box.querySelectorAll('.v389-pass-account').forEach(btn=>{
-      btn.onclick = ()=>{
-        const newPass = prompt(getLang()==='ar' ? 'أدخل كلمة المرور الجديدة' : 'Enter new password');
-        if (!newPass) return;
-        const user = btn.dataset.user;
-        const extrasNow = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
-        const idx = extrasNow.findIndex(a => norm(a.user) === norm(user));
-        if (idx >= 0){
-          extrasNow[idx].pass = newPass;
-        } else if (typeof ADMINS !== 'undefined'){
-          const built = ADMINS.find(a => norm(a.user) === norm(user));
-          if (built) extrasNow.push({ user: built.user, pass: newPass, role:'admin', permissions:(typeof defaultAdminPermissions==='function'?defaultAdminPermissions():[]) });
-        }
-        if (typeof setAccessAccounts === 'function') setAccessAccounts(extrasNow);
-        v389RenderAccounts();
-      };
-    });
-    box.querySelectorAll('.v389-del-account').forEach(btn=>{
-      btn.onclick = ()=>{
-        if (!confirm(getLang()==='ar' ? 'هل تريد حذف هذا الحساب؟' : 'Delete this account?')) return;
-        const extrasNow = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
-        const next = extrasNow.filter(a => norm(a.user) !== norm(btn.dataset.user));
-        if (typeof setAccessAccounts === 'function') setAccessAccounts(next);
-        v389RenderAccounts();
-      };
-    });
-  }
-
-  function v389SaveUser(){
-    const user = (document.getElementById('accessAccountUser')?.value || '').trim();
-    const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
-    const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
-    if (!user || !pass){
-      alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
-      return;
-    }
-    const permissions = role === 'admin'
-      ? (typeof defaultAdminPermissions === 'function' ? defaultAdminPermissions() : [...PERMISSIONS])
-      : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
-    if (role !== 'admin' && permissions.length === 0){
-      alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
-      return;
-    }
-    const extras = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
-    const idx = extras.findIndex(a => norm(a.user) === norm(user));
-    const payload = { user, pass, role, permissions };
-    if (idx >= 0) extras[idx] = payload; else extras.push(payload);
-    if (typeof setAccessAccounts === 'function') setAccessAccounts(extras);
-    const u = document.getElementById('accessAccountUser');
-    const p = document.getElementById('accessAccountPass');
-    const r = document.getElementById('accessAccountRole');
-    if (u) u.value = '';
-    if (p) p.value = '';
-    if (r) r.value = 'user';
-    if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
-    v389RenderAccounts();
     alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
-  }
-
-  function v389RenderArchivedTests(){
-    const panel = document.getElementById('archivedTestsPanel');
-    if (!panel) return;
-    const archived = (typeof readJson === 'function' && typeof storeKeys !== 'undefined') ? readJson(storeKeys.archivedTeacherTestsV382 || 'archivedTeacherTestsV382', []) : [];
-    panel.innerHTML = archived.length ? archived.map((t,idx)=>`
-      <div class="question-edit-card">
-        <div class="meta-line">
-          <span><strong>${escapeHtml(t.name || 'Test')}</strong></span>
-          <span>${escapeHtml((t.grade || '').toUpperCase())}</span>
-          <span>${t.archived ? 'Archived' : 'Cloned'}</span>
-          <span>${escapeHtml(t.createdAt || '')}</span>
-        </div>
-      </div>
-    `).join('') : `<div class="stored-question"><h4>No archived or cloned tests yet.</h4></div>`;
-  }
-
-  function v389RunSearch(){
-    const wrap = document.getElementById('storedQuestionsWrap');
-    if (!wrap) return;
-    if (typeof renderStoredQuestions === 'function') renderStoredQuestions();
-    const active = (document.querySelector('[data-filter-grade].active')?.dataset.filterGrade || 'all').toLowerCase();
-    const search = (document.getElementById('qSearchInput')?.value || '').toLowerCase().trim();
-    const skill = (document.getElementById('qSkillFilterInput')?.value || '').toLowerCase().trim();
-    const klass = (document.getElementById('qClassFilterInput')?.value || '').toLowerCase().trim();
-    let visible = 0;
-    wrap.querySelectorAll('.question-edit-card').forEach(card=>{
-      const cardGrade = (card.dataset.grade || '').toLowerCase();
-      const text = (card.querySelector('.qe-text')?.value || '').toLowerCase();
-      const qSkill = (card.querySelector('.qe-skill')?.value || '').toLowerCase();
-      const byGrade = active === 'all' || cardGrade === active;
-      const bySearch = !search || text.includes(search);
-      const bySkill = !skill || qSkill.includes(skill);
-      const byClass = !klass || cardGrade.includes(klass);
-      const show = byGrade && bySearch && bySkill && byClass;
-      card.style.display = show ? '' : 'none';
-      if (show) visible++;
-    });
-    const countEl = document.getElementById('questionResultsCount');
-    const noneEl = document.getElementById('questionNoResults');
-    const statusEl = document.getElementById('questionSearchStatus');
-    if (countEl) countEl.textContent = `${visible} question${visible === 1 ? '' : 's'} found`;
-    if (noneEl) noneEl.classList.toggle('hidden', visible !== 0);
-    if (statusEl) statusEl.textContent = visible ? 'Search results are shown below.' : 'No questions matched your current filters.';
-  }
-
-  function v389BindSearch(){
-    const run = document.getElementById('runQuestionSearchBtn');
-    const clear = document.getElementById('clearQuestionSearchBtn');
-    const showAll = document.getElementById('showAllQuestionsBtn');
-    if (run && !run.dataset.v389){
-      const fresh = run.cloneNode(true);
-      run.parentNode.replaceChild(fresh, run);
-      fresh.dataset.v389 = '1';
-      fresh.onclick = (e)=>{ e.preventDefault(); v389RunSearch(); };
-    }
-    if (clear && !clear.dataset.v389){
-      const fresh = clear.cloneNode(true);
-      clear.parentNode.replaceChild(fresh, clear);
-      fresh.dataset.v389 = '1';
-      fresh.onclick = (e)=>{
-        e.preventDefault();
-        ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id => {
-          const el = document.getElementById(id); if (el) el.value = '';
-        });
-        document.querySelectorAll('[data-filter-grade]').forEach(btn => btn.classList.toggle('active', (btn.dataset.filterGrade || '').toLowerCase()==='all'));
-        v389RunSearch();
-      };
-    }
-    const show = document.getElementById('showAllQuestionsBtn');
-    if (show && !show.dataset.v389){
-      const fresh = show.cloneNode(true);
-      show.parentNode.replaceChild(fresh, show);
-      fresh.dataset.v389 = '1';
-      fresh.onclick = (e)=>{
-        e.preventDefault();
-        if (typeof renderStoredQuestions === 'function') renderStoredQuestions();
-        setTimeout(v389RunSearch, 30);
-      };
-    }
-    ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id=>{
-      const el = document.getElementById(id);
-      if (el && !el.dataset.v389){
-        el.dataset.v389 = '1';
-        el.oninput = ()=> v389RunSearch();
-      }
-    });
-    document.querySelectorAll('[data-filter-grade]').forEach(btn=>{
-      if (btn.dataset.v389) return;
-      btn.dataset.v389 = '1';
-      btn.onclick = (e)=>{ e.preventDefault(); document.querySelectorAll('[data-filter-grade]').forEach(b=>b.classList.toggle('active', b===btn)); v389RunSearch(); };
-    });
-    v389RunSearch();
-  }
-
-  function v389RebindAfterLogin(){
-    const save = document.getElementById('saveAccessAccountBtn');
-    if (save && !save.dataset.v389){
-      const fresh = save.cloneNode(true);
-      save.parentNode.replaceChild(fresh, save);
-      fresh.dataset.v389 = '1';
-      fresh.onclick = (e)=>{ e.preventDefault(); v389SaveUser(); };
-    }
-    v389RenderAccounts();
-    v389BindSearch();
-    v389RenderArchivedTests();
-  }
-
-  window.addEventListener('load', ()=>{
-    setTimeout(v389RebindAfterLogin, 60);
-    const adminBtn = document.getElementById('adminLoginBtn');
-    if (adminBtn && !adminBtn.dataset.v389){
-      adminBtn.dataset.v389 = '1';
-      adminBtn.addEventListener('click', ()=> setTimeout(v389RebindAfterLogin, 180));
-    }
-  });
-})();
-
-
-/* === v39 logic port fix === */
-(function(){
-  function norm(v){ return String(v||'').trim().toLowerCase(); }
-
-  function accountStorageGet(){
-    try{
-      return typeof getAccessAccounts === 'function' ? (getAccessAccounts() || []) : [];
-    }catch(e){ return []; }
-  }
-  function accountStorageSet(v){
-    try{
-      if (typeof setAccessAccounts === 'function') setAccessAccounts(v || []);
-    }catch(e){}
-  }
-  function builtInAccounts(){
-    try{
-      const perms = typeof defaultAdminPermissions === 'function' ? defaultAdminPermissions() : (Array.isArray(PERMISSIONS) ? [...PERMISSIONS] : []);
-      return (typeof ADMINS !== 'undefined' ? ADMINS : []).map(a => ({
-        user:a.user, pass:a.pass, role:'admin', permissions:perms, builtIn:true
-      }));
-    }catch(e){ return []; }
-  }
-
-  window.getLoginAccount = function(user, pass){
-    const u = norm(user), p = String(pass || '').trim();
-    const built = builtInAccounts().find(a => norm(a.user) === u);
-    if (built && built.pass === p) return built;
-    const extras = accountStorageGet();
-    const match = extras.find(a => norm(a.user) === u && String(a.pass || '').trim() === p);
-    return match || null;
   };
 
-  function v39RenderAccountsPort(){
-    const box = document.getElementById('accessAccountsList');
-    if (!box) return;
-    const all = [...builtInAccounts(), ...accountStorageGet()];
-    if (!all.length){
-      box.innerHTML = '<div class="stored-question"><h4>No extra accounts yet.</h4></div>';
-      return;
-    }
-    box.innerHTML = all.map((acc, idx) => {
-      const perms = acc.role === 'admin'
-        ? 'All permissions'
-        : ((acc.permissions || []).map(permissionLabel).join(', ') || '-');
-      return `<div class="question-edit-card">
-        <div class="meta-line">
-          <span><strong>${escapeHtml(acc.user || '')}</strong></span>
-          <span>${escapeHtml(acc.role || '')}</span>
-          <span>${escapeHtml(perms)}</span>
-          ${acc.builtIn ? '<span>Built-in</span>' : ''}
-        </div>
-        <div class="question-edit-actions">
-          <button class="ghost-btn v39-edit-account" data-user="${escapeHtml(acc.user || '')}">Edit</button>
-          <button class="ghost-btn v39-pass-account" data-user="${escapeHtml(acc.user || '')}">Password</button>
-          ${acc.builtIn ? '' : `<button class="danger-btn v39-del-account" data-user="${escapeHtml(acc.user || '')}">Delete</button>`}
-        </div>
-      </div>`;
-    }).join('');
-
-    box.querySelectorAll('.v39-edit-account').forEach(btn => btn.onclick = () => {
-      const acc = all.find(a => norm(a.user) === norm(btn.dataset.user));
-      if (!acc) return;
-      const u = document.getElementById('accessAccountUser');
-      const p = document.getElementById('accessAccountPass');
-      const r = document.getElementById('accessAccountRole');
-      if (u) u.value = acc.user || '';
-      if (p) p.value = acc.pass || '';
-      if (r) r.value = acc.role || 'user';
-      if (typeof renderAccessPermissions === 'function') renderAccessPermissions(acc.permissions || []);
-    });
-
-    box.querySelectorAll('.v39-pass-account').forEach(btn => btn.onclick = () => {
-      const next = prompt(getLang() === 'ar' ? 'أدخل كلمة المرور الجديدة' : 'Enter new password');
-      if (!next) return;
-      const extras = accountStorageGet();
-      const idx = extras.findIndex(a => norm(a.user) === norm(btn.dataset.user));
-      if (idx >= 0){
-        extras[idx].pass = next;
-      } else {
-        const built = builtInAccounts().find(a => norm(a.user) === norm(btn.dataset.user));
-        if (built){
-          const existing = extras.findIndex(a => norm(a.user) === norm(built.user));
-          const payload = { user:built.user, pass:next, role:'admin', permissions:built.permissions || [] };
-          if (existing >= 0) extras[existing] = payload; else extras.push(payload);
-        }
-      }
-      accountStorageSet(extras);
-      v39RenderAccountsPort();
-      alert(getLang() === 'ar' ? 'تم تحديث كلمة المرور.' : 'Password updated.');
-    });
-
-    box.querySelectorAll('.v39-del-account').forEach(btn => btn.onclick = () => {
-      if (!confirm(getLang() === 'ar' ? 'هل تريد حذف هذا الحساب؟' : 'Delete this account?')) return;
-      const next = accountStorageGet().filter(a => norm(a.user) !== norm(btn.dataset.user));
-      accountStorageSet(next);
-      v39RenderAccountsPort();
-      alert(getLang() === 'ar' ? 'تم حذف الحساب.' : 'Account deleted.');
-    });
-  }
-
-  function v39SaveAccountPort(){
-    const user = (document.getElementById('accessAccountUser')?.value || '').trim();
-    const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
-    const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
-    if (!user || !pass){
-      alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
-      return;
-    }
-    const permissions = role === 'admin'
-      ? (typeof defaultAdminPermissions === 'function' ? defaultAdminPermissions() : [...PERMISSIONS])
-      : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
-    if (role !== 'admin' && permissions.length === 0){
-      alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission.');
-      return;
-    }
-    const all = accountStorageGet();
-    const idx = all.findIndex(a => norm(a.user) === norm(user));
-    const payload = { user, pass, role, permissions };
-    if (idx >= 0) all[idx] = payload; else all.push(payload);
-    accountStorageSet(all);
-    const u = document.getElementById('accessAccountUser');
-    const p = document.getElementById('accessAccountPass');
-    const r = document.getElementById('accessAccountRole');
-    if (u) u.value = '';
-    if (p) p.value = '';
-    if (r) r.value = 'user';
-    if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
-    v39RenderAccountsPort();
-    alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
-  }
-
-  function searchRenderQuestions(){
-    try{
-      if (typeof renderStoredQuestions === 'function') renderStoredQuestions();
-    }catch(e){}
-    const wrap = document.getElementById('storedQuestionsWrap');
-    if (!wrap) return;
-    const active = (document.querySelector('[data-filter-grade].active')?.dataset.filterGrade || 'all').toLowerCase();
-    const search = (document.getElementById('qSearchInput')?.value || '').toLowerCase().trim();
-    const skill = (document.getElementById('qSkillFilterInput')?.value || '').toLowerCase().trim();
-    const klass = (document.getElementById('qClassFilterInput')?.value || '').toLowerCase().trim();
-    let visible = 0;
-    wrap.querySelectorAll('.question-edit-card').forEach(card => {
-      const cardGrade = (card.dataset.grade || '').toLowerCase();
-      const qText = (card.querySelector('.qe-text')?.value || '').toLowerCase();
-      const qSkill = (card.querySelector('.qe-skill')?.value || '').toLowerCase();
-      const byGrade = active === 'all' || cardGrade === active;
-      const bySearch = !search || qText.includes(search);
-      const bySkill = !skill || qSkill.includes(skill);
-      const byClass = !klass || cardGrade.includes(klass);
-      const show = byGrade && bySearch && bySkill && byClass;
-      card.style.display = show ? '' : 'none';
-      if (show) visible++;
-    });
-    const countEl = document.getElementById('questionResultsCount');
-    const noneEl = document.getElementById('questionNoResults');
-    const statusEl = document.getElementById('questionSearchStatus');
-    if (countEl) countEl.textContent = `${visible} question${visible === 1 ? '' : 's'} found`;
-    if (noneEl) noneEl.classList.toggle('hidden', visible !== 0);
-    if (statusEl) statusEl.textContent = visible ? 'Search results are shown below.' : 'No questions matched your current filters.';
-  }
-
-  function bindSearchControlsPort(){
-    const bindReplace = (id, handler) => {
-      const old = document.getElementById(id);
-      if (!old) return;
-      const fresh = old.cloneNode(true);
-      old.parentNode.replaceChild(fresh, old);
-      fresh.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); handler(); });
-    };
-    bindReplace('runQuestionSearchBtn', searchRenderQuestions);
-    bindReplace('clearQuestionSearchBtn', () => {
-      ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
-      });
-      document.querySelectorAll('[data-filter-grade]').forEach(btn => {
-        btn.classList.toggle('active', (btn.dataset.filterGrade || '').toLowerCase() === 'all');
-      });
-      searchRenderQuestions();
-      const statusEl = document.getElementById('questionSearchStatus');
-      if (statusEl) statusEl.textContent = 'Search results appear below automatically.';
-    });
-    bindReplace('showAllQuestionsBtn', () => {
-      ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
-      });
-      document.querySelectorAll('[data-filter-grade]').forEach(btn => {
-        btn.classList.toggle('active', true);
-      });
-      const allBtn = Array.from(document.querySelectorAll('[data-filter-grade]')).find(btn => (btn.dataset.filterGrade || '').toLowerCase() === 'all');
-      document.querySelectorAll('[data-filter-grade]').forEach(btn => btn.classList.toggle('active', btn === allBtn));
-      searchRenderQuestions();
-    });
-    ['qSearchInput','qSkillFilterInput','qClassFilterInput'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el && !el.dataset.v39port){
-        el.dataset.v39port = '1';
-        el.addEventListener('input', searchRenderQuestions);
-      }
-    });
-    document.querySelectorAll('[data-filter-grade]').forEach(btn => {
-      if (btn.dataset.v39port) return;
-      btn.dataset.v39port = '1';
-      btn.addEventListener('click', function(e){
-        e.preventDefault();
-        document.querySelectorAll('[data-filter-grade]').forEach(b => b.classList.toggle('active', b === btn));
-        searchRenderQuestions();
-      });
-    });
-    searchRenderQuestions();
-  }
-
-  function renderArchivedTestsPort(){
-    const panel = document.getElementById('archivedTestsPanel');
-    if (!panel) return;
-    const archived = (typeof readJson === 'function' && typeof storeKeys !== 'undefined') ? readJson(storeKeys.archivedTeacherTestsV382 || 'archivedTeacherTestsV382', []) : [];
-    panel.innerHTML = archived.length ? archived.map(t => `
-      <div class="question-edit-card">
-        <div class="meta-line">
-          <span><strong>${escapeHtml(t.name || 'Test')}</strong></span>
-          <span>${escapeHtml((t.grade || '').toUpperCase())}</span>
-          <span>${t.archived ? 'Archived' : 'Cloned'}</span>
-          <span>${escapeHtml(t.createdAt || '')}</span>
-        </div>
-      </div>
-    `).join('') : '<div class="stored-question"><h4>No archived or cloned tests yet.</h4></div>';
-  }
-
-  function bindAfterAdminOpenPort(){
+  function bindProAccountButtons(){
     const saveBtn = document.getElementById('saveAccessAccountBtn');
     if (saveBtn){
       const fresh = saveBtn.cloneNode(true);
       saveBtn.parentNode.replaceChild(fresh, saveBtn);
-      fresh.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); v39SaveAccountPort(); });
+      fresh.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        saveAccessAccountFromAdmin();
+      });
     }
-    v39RenderAccountsPort();
-    bindSearchControlsPort();
-    renderArchivedTestsPort();
+    renderAccessAccountsList();
   }
 
   window.addEventListener('load', function(){
-    setTimeout(bindAfterAdminOpenPort, 120);
+    setTimeout(bindProAccountButtons, 120);
     const adminBtn = document.getElementById('adminLoginBtn');
-    if (adminBtn && !adminBtn.dataset.v39port){
-      adminBtn.dataset.v39port = '1';
-      adminBtn.addEventListener('click', function(){ setTimeout(bindAfterAdminOpenPort, 220); });
+    if (adminBtn && !adminBtn.dataset.proAccountBind){
+      adminBtn.dataset.proAccountBind = '1';
+      adminBtn.addEventListener('click', function(){
+        setTimeout(bindProAccountButtons, 220);
+      });
     }
   });
 })();

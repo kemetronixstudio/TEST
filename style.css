@@ -462,27 +462,25 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
 }
 
 
-/* v38.7 user search fix */
-.v384-search-tools{margin-top:10px;align-items:center}
-.search-results-note{color:#5d718d;font-size:.92rem}
-.search-results-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
-#questionNoResults{color:#e55252;font-weight:700}
-
-
-/* v38.9 admin power fix */
-#archivedTestsPanel .stored-question, #archivedTestsPanel .question-edit-card, #accessAccountsList .question-edit-card{
-  margin-bottom:10px;
+/* v38 pro account system */
+#accessAccountsList .question-edit-card,
+#accessAccountsList .account-card{
+  margin-bottom:12px;
 }
-.admin-tools-strong{
+#accessAccountsList .question-edit-actions,
+#accessAccountsList .account-actions{
   display:flex;
   gap:10px;
   flex-wrap:wrap;
 }
-
-
-/* v39 logic port fix */
-.v384-search-tools{margin-top:10px;align-items:center;display:flex;gap:10px;flex-wrap:wrap}
-.search-results-note{color:#5d718d;font-size:.92rem}
-.search-results-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
-#questionNoResults{color:#e55252;font-weight:700}
-#archivedTestsPanel .question-edit-card,#accessAccountsList .question-edit-card{margin-bottom:10px}
+#accessAccountsList .meta-line{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+#accessAccountsList .perm-list{
+  color:#5d718d;
+  font-size:.92rem;
+  margin:8px 0 10px;
+}
