@@ -478,3 +478,11 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
   gap:10px;
   flex-wrap:wrap;
 }
+
+
+/* v39 logic port fix */
+.v384-search-tools{margin-top:10px;align-items:center;display:flex;gap:10px;flex-wrap:wrap}
+.search-results-note{color:#5d718d;font-size:.92rem}
+.search-results-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
+#questionNoResults{color:#e55252;font-weight:700}
+#archivedTestsPanel .question-edit-card,#accessAccountsList .question-edit-card{margin-bottom:10px}
