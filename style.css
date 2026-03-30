@@ -438,53 +438,8 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
 .class-edit-btn{margin-right:8px}
 
 
-/* v38.3 question types */
-.advanced-card{
-  display:grid;
-  gap:12px;
-  padding:12px;
-  border:1px solid #d9e6f5;
-  border-radius:18px;
-  background:#f8fbff;
-}
-.advanced-input{
-  width:100%;
-  padding:14px 16px;
-  border-radius:16px;
-  border:1px solid #d7e6f5;
-  font-size:1rem;
-}
-.letters-bank,.drop-zone{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  min-height:52px;
-  padding:12px;
-  border-radius:16px;
-  border:1px dashed #9fc1ef;
-  background:#fff;
-}
-.letter-chip,.placed-letter{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:44px;
-  height:44px;
-  padding:0 12px;
-  border:none;
-  border-radius:14px;
-  background:#eef5ff;
-  box-shadow:0 6px 14px rgba(36,68,111,.08);
-  cursor:pointer;
-  font-weight:700;
-}
-.drag-drop-zone{
-  margin-top:12px;
-  justify-content:center;
-  color:#56718e;
-}
-.actions-row{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
+/* v38.4 question search UX */
+.v384-search-tools{margin-top:10px;align-items:center}
+.search-results-note{color:#5d718d;font-size:.92rem}
+.search-results-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
+#questionNoResults{color:#e55252;font-weight:700}
