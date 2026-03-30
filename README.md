@@ -49,3 +49,7 @@ This package is the freeze-fix build v22. If you update from an older release, c
 
 ## v38 stable
 This package restores a stable quiz flow build and bumps the cache version to avoid loading older broken cached files.
+
+
+## v38.6 recovered
+Removed a malformed injected JS block that was preventing the quiz and admin pages from opening.
