@@ -484,3 +484,12 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
   font-size:.92rem;
   margin:8px 0 10px;
 }
+
+
+/* pro account upgrade final */
+.pro-acc-card{margin-bottom:12px}
+.pro-acc-perms{
+  color:#5d718d;
+  font-size:.92rem;
+  margin:8px 0 10px;
+}
