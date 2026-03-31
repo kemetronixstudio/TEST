@@ -2000,3 +2000,160 @@ function isDuplicateQuestionEnhanced(text, list){
     window.addEventListener('load', bindProAccountManager);
   }
 })();
+
+/* === v38.13 access account manager fallback fix === */
+(function(){
+  if (typeof document === 'undefined' || !document.body || document.body.dataset.page !== 'admin') return;
+  const SESSION_KEY = 'kgEnglishAccessSessionV1';
+
+  function adminPanelVisible(){
+    const panel = document.getElementById('adminPanel');
+    return !!(panel && !panel.classList.contains('hidden'));
+  }
+  function persistAccount(account){
+    if (!account) return null;
+    window.__currentAccessAccount = account;
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: account.user, originalUser: account.originalUser || account.user }));
+    } catch(err) {}
+    return account;
+  }
+  function readSession(){
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch(err) {
+      return null;
+    }
+  }
+  function builtInLookup(user, pass){
+    const u = String(user || '').trim().toLowerCase();
+    const p = String(pass || '').trim();
+    if (!u || !p || typeof ADMINS === 'undefined' || !Array.isArray(ADMINS)) return null;
+    const match = ADMINS.find(function(item){
+      return String(item.user || '').trim().toLowerCase() === u && String(item.pass || '').trim() === p;
+    });
+    if (!match) return null;
+    const perms = Array.isArray(window.PERMISSIONS) ? window.PERMISSIONS.slice() : ['dashboard','levelVisibility','timerSettings','quizAccess','teacherTest','bulkQuestions','questionBank','classManager','accountManager'];
+    return {
+      user: String(match.user || '').trim(),
+      pass: String(match.pass || '').trim(),
+      role: 'admin',
+      permissions: perms,
+      originalUser: String(match.user || '').trim(),
+      builtIn: true,
+      builtInOverride: false
+    };
+  }
+  function resolveCurrentAccount(){
+    const current = window.__currentAccessAccount;
+    if (current && current.role === 'admin') return current;
+
+    let candidate = null;
+    const loginUser = document.getElementById('adminUser')?.value || '';
+    const loginPass = document.getElementById('adminPass')?.value || '';
+    if (loginUser && loginPass && typeof window.getLoginAccount === 'function') {
+      try { candidate = window.getLoginAccount(loginUser, loginPass); } catch(err) {}
+    }
+    if (!candidate && loginUser && loginPass) candidate = builtInLookup(loginUser, loginPass);
+
+    if (!candidate) {
+      const stored = readSession();
+      const storedUser = stored && (stored.originalUser || stored.user) ? String(stored.originalUser || stored.user).trim() : '';
+      if (storedUser && typeof window.getLoginAccount === 'function') {
+        try {
+          if (loginUser && loginPass) candidate = window.getLoginAccount(loginUser, loginPass);
+        } catch(err) {}
+      }
+    }
+
+    if (candidate) return persistAccount(candidate);
+    return current || null;
+  }
+
+  function refreshAccountUi(){
+    resolveCurrentAccount();
+    if (!adminPanelVisible()) return;
+    if (typeof window.renderAccessPermissions === 'function') {
+      try { window.renderAccessPermissions(Array.from(document.querySelectorAll('.perm-check:checked')).map(function(el){ return el.value; })); } catch(err) {}
+    }
+    if (typeof window.renderAccessAccountsList === 'function') {
+      try { window.renderAccessAccountsList(); } catch(err) {}
+    }
+  }
+
+  if (typeof window.renderAccessAccountsList === 'function') {
+    const originalRenderAccessAccountsList = window.renderAccessAccountsList;
+    window.renderAccessAccountsList = function(){
+      resolveCurrentAccount();
+      return originalRenderAccessAccountsList.apply(this, arguments);
+    };
+  }
+  if (typeof window.saveAccessAccountFromAdmin === 'function') {
+    const originalSaveAccessAccountFromAdmin = window.saveAccessAccountFromAdmin;
+    window.saveAccessAccountFromAdmin = function(){
+      resolveCurrentAccount();
+      return originalSaveAccessAccountFromAdmin.apply(this, arguments);
+    };
+  }
+  ['accEditByUser','accDeleteByUser','accChangePassByUser'].forEach(function(name){
+    if (typeof window[name] === 'function') {
+      const original = window[name];
+      window[name] = function(){
+        resolveCurrentAccount();
+        return original.apply(this, arguments);
+      };
+    }
+  });
+
+  if (!document.documentElement.dataset.v3813AccountFix) {
+    document.documentElement.dataset.v3813AccountFix = '1';
+    document.addEventListener('click', function(event){
+      const loginBtn = event.target.closest('#adminLoginBtn');
+      if (loginBtn) {
+        setTimeout(function(){
+          resolveCurrentAccount();
+          refreshAccountUi();
+        }, 80);
+        return;
+      }
+
+      const saveBtn = event.target.closest('#saveAccessAccountBtn');
+      if (saveBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        resolveCurrentAccount();
+        if (typeof window.saveAccessAccountFromAdmin === 'function') window.saveAccessAccountFromAdmin();
+        return;
+      }
+
+      const clearBtn = event.target.closest('#clearAccessAccountBtn');
+      if (clearBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof window.clearAccessAccountForm === 'function') window.clearAccessAccountForm();
+        const status = document.getElementById('accessAccountsStatus');
+        if (status) {
+          status.textContent = (typeof getLang === 'function' && getLang() === 'ar') ? 'تم مسح النموذج.' : 'Form cleared.';
+          status.dataset.state = 'info';
+        }
+        refreshAccountUi();
+        return;
+      }
+    }, true);
+
+    document.addEventListener('change', function(event){
+      const role = event.target.closest('#accessAccountRole');
+      if (role && typeof window.renderAccessPermissions === 'function') {
+        window.renderAccessPermissions([]);
+      }
+    }, true);
+
+    window.addEventListener('load', function(){
+      setTimeout(refreshAccountUi, 120);
+      setTimeout(refreshAccountUi, 500);
+    });
+    setTimeout(refreshAccountUi, 120);
+    setTimeout(refreshAccountUi, 500);
+  }
+})();
