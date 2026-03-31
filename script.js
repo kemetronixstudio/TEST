@@ -903,8 +903,15 @@ function isDuplicateQuestionEnhanced(text, list){
   window.renderStoredQuestions = function(){
     const list = document.getElementById('storedQuestionsList'); if(!list) return;
     let items = [...collectQuestionsWithMeta('kg1'), ...collectQuestionsWithMeta('kg2')];
-    if (typeof window.getCustomClasses === 'function'){
-      window.getCustomClasses().forEach(cls => { items = items.concat(collectQuestionsWithMeta(cls.key)); });
+    try {
+      const extraClasses = Array.isArray(readJson('kgEnglishCustomClassesV29', null))
+        ? readJson('kgEnglishCustomClassesV29', [])
+        : (typeof window.getCustomClasses === 'function' ? window.getCustomClasses() : []);
+      (Array.isArray(extraClasses) ? extraClasses : []).forEach(cls => {
+        if (cls && cls.key) items = items.concat(collectQuestionsWithMeta(cls.key));
+      });
+    } catch(err) {
+      console.warn('Skipping custom class question merge', err);
     }
     items = items.map(applyQuestionOverrides);
     list.innerHTML = items.length ? items.map(questionEditorCard).join('') : '<div class="stored-question"><h4>No questions yet.</h4><p>Add questions from the editor above.</p></div>';
@@ -2157,3 +2164,102 @@ function isDuplicateQuestionEnhanced(text, list){
     setTimeout(refreshAccountUi, 500);
   }
 })();
+
+
+/* === v38.14 dashboard missing-functions recovery === */
+function populateDashboardDateFilter(){
+  const select = document.getElementById('dashboardDateFilter');
+  if (!select) return;
+  const current = select.value || 'all';
+  const log = Array.isArray(getAttemptsLog()) ? getAttemptsLog() : [];
+  const seen = new Set();
+  const dates = [];
+  log.forEach(function(item){
+    const iso = String(item && (item.isoDate || '') || '').trim();
+    const display = String(item && (item.date || '') || '').trim();
+    const value = iso || (display ? display.split('/').reverse().join('-') : '');
+    if (value && !seen.has(value)){
+      seen.add(value);
+      dates.push({ value: value, label: display || value });
+    }
+  });
+  dates.sort(function(a,b){ return String(b.value).localeCompare(String(a.value)); });
+  const lang = typeof getLang === 'function' ? getLang() : 'en';
+  const allLabel = (translations && translations[lang] && translations[lang].allDates) || 'All Dates';
+  select.innerHTML = '<option value="all">' + escapeHtml(allLabel) + '</option>' + dates.map(function(item){
+    return '<option value="' + escapeHtml(item.value) + '">' + escapeHtml(item.label) + '</option>';
+  }).join('');
+  select.value = seen.has(current) || current === 'all' ? current : 'all';
+}
+
+function getFilteredDashboardData(){
+  const select = document.getElementById('dashboardDateFilter');
+  const selected = String(select && select.value || 'all').trim() || 'all';
+  const attempts = Array.isArray(getAttemptsLog()) ? getAttemptsLog() : [];
+  const filtered = attempts.filter(function(item){
+    if (selected === 'all') return true;
+    const iso = String(item && (item.isoDate || '') || '').trim();
+    return iso === selected;
+  });
+  const grouped = new Map();
+  const skillMisses = {};
+  const questionMisses = {};
+  filtered.forEach(function(item){
+    const name = String(item && item.studentName || '').trim() || 'Unknown';
+    const key = name.toLowerCase();
+    const row = grouped.get(key) || {
+      name: name,
+      grade: String(item && item.grade || '').trim(),
+      attempts: 0,
+      best: 0,
+      last: 0,
+      weakAreas: []
+    };
+    row.attempts += 1;
+    row.grade = row.grade || String(item && item.grade || '').trim();
+    row.best = Math.max(row.best, Number(item && item.percent || 0) || 0);
+    row.last = Number(item && item.percent || 0) || 0;
+    row.weakAreas = Array.from(new Set([].concat(row.weakAreas || [], Array.isArray(item && item.weaknesses) ? item.weaknesses : []))).slice(0,4);
+    grouped.set(key, row);
+
+    (Array.isArray(item && item.weaknesses) ? item.weaknesses : []).forEach(function(skill){
+      const clean = String(skill || '').trim();
+      if (!clean) return;
+      skillMisses[clean] = (skillMisses[clean] || 0) + 1;
+    });
+    (Array.isArray(item && item.missedQuestions) ? item.missedQuestions : []).forEach(function(question){
+      const clean = String(question || '').trim();
+      if (!clean) return;
+      questionMisses[clean] = (questionMisses[clean] || 0) + 1;
+    });
+  });
+  return {
+    selected: selected,
+    filtered: filtered,
+    groupedRows: Array.from(grouped.values()).sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); }),
+    skillMisses: skillMisses,
+    questionMisses: questionMisses
+  };
+}
+
+function resetDashboardData(){
+  const lang = typeof getLang === 'function' ? getLang() : 'en';
+  const msg = lang === 'ar'
+    ? 'سيتم حذف كل بيانات الطلاب ومحاولات الاختبار والإحصائيات. هل تريد المتابعة؟'
+    : 'This will remove all student records, attempts, and analytics data. Continue?';
+  if (typeof confirm === 'function' && !confirm(msg)) return;
+  try {
+    localStorage.removeItem(storeKeys.progress);
+    localStorage.removeItem(storeKeys.records);
+    localStorage.removeItem(storeKeys.analytics);
+    localStorage.removeItem(storeKeys.attemptsLog);
+  } catch(err) {}
+  try {
+    renderHomeProgress();
+    populateDashboardDateFilter();
+    renderAdminDashboard();
+  } catch(err) {}
+  if (typeof alert === 'function') {
+    alert(lang === 'ar' ? 'تم حذف بيانات لوحة المتابعة.' : 'Dashboard data has been reset.');
+  }
+}
