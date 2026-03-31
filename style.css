@@ -462,6 +462,10 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
 }
 
 
-/* account real fix */
-#accessAccountsList .account-card{margin-bottom:12px}
-#accessAccountsList .account-actions{display:flex;gap:10px;flex-wrap:wrap}
+/* v38.10 final account admin fix */
+.account-realfix-card{margin-bottom:12px}
+.account-perms-line{
+  color:#5d718d;
+  font-size:.92rem;
+  margin:8px 0 10px;
+}

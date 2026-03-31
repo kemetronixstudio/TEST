@@ -976,122 +976,190 @@ function isDuplicateQuestionEnhanced(text, list){
 
 
 
-/* === account real fix === */
+/* === v38.10 final account admin fix === */
 (function(){
   function accNorm(v){ return String(v || '').trim().toLowerCase(); }
 
+  function builtInAdminRows(){
+    const perms = (typeof defaultAdminPermissions === 'function') ? defaultAdminPermissions() : (Array.isArray(PERMISSIONS) ? [...PERMISSIONS] : []);
+    const base = (typeof ADMINS !== 'undefined' && Array.isArray(ADMINS)) ? ADMINS : [];
+    return base.map(a => ({ user:a.user, pass:a.pass, role:'admin', permissions:perms, builtIn:true }));
+  }
+
+  function editableAccounts(){
+    try{
+      const raw = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+      return Array.isArray(raw) ? raw.map(a => ({
+        user: a.user || a.username || '',
+        pass: a.pass || a.password || '',
+        role: a.role || 'user',
+        permissions: Array.isArray(a.permissions) ? a.permissions : []
+      })) : [];
+    }catch(e){ return []; }
+  }
+
+  function saveEditableAccounts(list){
+    const safe = Array.isArray(list) ? list : [];
+    if (typeof setAccessAccounts === 'function') setAccessAccounts(safe);
+  }
+
+  function combinedAccounts(){
+    const built = builtInAdminRows();
+    const extra = editableAccounts();
+    const merged = [...built];
+    extra.forEach(acc => {
+      const idx = merged.findIndex(x => accNorm(x.user) === accNorm(acc.user));
+      if (idx >= 0) merged[idx] = { ...acc, builtIn:true, override:true };
+      else merged.push({ ...acc, builtIn:false });
+    });
+    return merged;
+  }
+
+  window.getLoginAccount = function(user, pass){
+    const u = accNorm(user);
+    const p = String(pass || '').trim();
+
+    const extra = editableAccounts().find(a => accNorm(a.user) === u && String(a.pass || '').trim() === p);
+    if (extra) return extra;
+
+    const built = builtInAdminRows().find(a => accNorm(a.user) === u && a.pass === p);
+    if (built) return { user:built.user, role:'admin', permissions:built.permissions, builtIn:true };
+
+    return null;
+  };
+
+  function restorePermissions(perms){
+    const set = new Set(Array.isArray(perms) ? perms : []);
+    document.querySelectorAll('.perm-check').forEach(cb => cb.checked = set.has(cb.value));
+  }
+
   window.accEditByUser = function(user){
-    const accounts = getAccessAccounts();
-    const acc = accounts.find(a => accNorm(a.user) === accNorm(user));
+    const acc = combinedAccounts().find(a => accNorm(a.user) === accNorm(user));
     if (!acc) return;
     const u = document.getElementById('accessAccountUser');
     const p = document.getElementById('accessAccountPass');
     const r = document.getElementById('accessAccountRole');
     if (u) u.value = acc.user || '';
     if (p) p.value = acc.pass || '';
-    if (r) r.value = acc.role || 'user';
-    if (typeof renderAccessPermissions === 'function') {
-      renderAccessPermissions(acc.permissions || []);
-      setTimeout(() => {
-        const set = new Set(acc.permissions || []);
-        document.querySelectorAll('.perm-check').forEach(cb => {
-          cb.checked = set.has(cb.value);
-        });
-      }, 20);
+    if (r){
+      r.value = acc.role || 'user';
+      if (typeof renderAccessPermissions === 'function') renderAccessPermissions(acc.permissions || []);
     }
-  };
-
-  window.accChangePassByUser = function(user){
-    const accounts = getAccessAccounts();
-    const idx = accounts.findIndex(a => accNorm(a.user) === accNorm(user));
-    if (idx < 0) return;
-    const next = prompt((typeof getLang === 'function' && getLang() === 'ar') ? 'أدخل كلمة المرور الجديدة' : 'New password:');
-    if (!next) return;
-    accounts[idx].pass = next;
-    setAccessAccounts(accounts);
-    renderAccessAccountsList();
-    alert((typeof getLang === 'function' && getLang() === 'ar') ? 'تم تحديث كلمة المرور.' : 'Password updated.');
+    setTimeout(() => restorePermissions(acc.permissions || []), 20);
   };
 
   window.accDeleteByUser = function(user){
-    if (!confirm((typeof getLang === 'function' && getLang() === 'ar') ? 'هل تريد حذف هذا الحساب؟' : 'Delete this account?')) return;
-    const next = getAccessAccounts().filter(a => accNorm(a.user) !== accNorm(user));
-    setAccessAccounts(next);
+    const built = builtInAdminRows().find(a => accNorm(a.user) === accNorm(user));
+    let list = editableAccounts();
+    if (built){
+      if (!confirm((typeof getLang === 'function' && getLang() === 'ar') ? 'سيتم حذف التعديل فقط والرجوع إلى بيانات المشرف الأساسية. هل تريد المتابعة؟' : 'This will remove only the override and return to the built-in admin data. Continue?')) return;
+      list = list.filter(a => accNorm(a.user) !== accNorm(user));
+    } else {
+      if (!confirm((typeof getLang === 'function' && getLang() === 'ar') ? 'هل تريد حذف هذا الحساب؟' : 'Delete this account?')) return;
+      list = list.filter(a => accNorm(a.user) !== accNorm(user));
+    }
+    saveEditableAccounts(list);
     renderAccessAccountsList();
+  };
+
+  window.accChangePassByUser = function(user){
+    const next = prompt((typeof getLang === 'function' && getLang() === 'ar') ? 'أدخل كلمة المرور الجديدة' : 'New password:');
+    if (!next) return;
+    let list = editableAccounts();
+    const idx = list.findIndex(a => accNorm(a.user) === accNorm(user));
+    if (idx >= 0){
+      list[idx].pass = next;
+    } else {
+      const built = builtInAdminRows().find(a => accNorm(a.user) === accNorm(user));
+      if (!built) return;
+      list.push({ user:built.user, pass:next, role:'admin', permissions:built.permissions || [] });
+    }
+    saveEditableAccounts(list);
+    renderAccessAccountsList();
+    alert((typeof getLang === 'function' && getLang() === 'ar') ? 'تم تحديث كلمة المرور.' : 'Password updated.');
   };
 
   window.renderAccessAccountsList = function(){
     const box = document.getElementById('accessAccountsList');
     if (!box) return;
-    const accounts = getAccessAccounts();
-    box.innerHTML = accounts.length ? accounts.map(a => `
-      <div class="account-card">
+    const list = combinedAccounts();
+    if (!list.length){
+      box.innerHTML = `<div class="stored-question"><h4>${(translations[getLang()] && translations[getLang()].noExtraAccounts) || 'No accounts yet.'}</h4></div>`;
+      return;
+    }
+    box.innerHTML = list.map(acc => `
+      <div class="account-card account-realfix-card">
         <div class="meta-line">
-          <span><strong>${escapeHtml(a.user || '')}</strong></span>
-          <span>${escapeHtml(a.role || '')}</span>
-          <span>${escapeHtml((a.permissions || []).map(permissionLabel).join(', ') || '-')}</span>
+          <span><strong>${escapeHtml(acc.user || '')}</strong></span>
+          <span>${escapeHtml(acc.role || '')}</span>
+          ${acc.builtIn ? `<span>${acc.override ? 'Built-in + Override' : 'Built-in'}</span>` : '<span>Saved</span>'}
         </div>
+        <div class="account-perms-line">${escapeHtml((acc.permissions || []).map(permissionLabel).join(', ') || '-')}</div>
         <div class="account-actions">
-          <button class="ghost-btn" onclick="accEditByUser('${String(a.user || '').replace(/'/g, "\\'")}')">Edit</button>
-          <button class="ghost-btn" onclick="accChangePassByUser('${String(a.user || '').replace(/'/g, "\\'")}')">Password</button>
-          <button class="danger-btn" onclick="accDeleteByUser('${String(a.user || '').replace(/'/g, "\\'")}')">${(translations[getLang()] && translations[getLang()].deleteAccount) || 'Delete'}</button>
+          <button class="ghost-btn" onclick="accEditByUser('${String(acc.user || '').replace(/'/g, "\\'")}')">Edit</button>
+          <button class="ghost-btn" onclick="accChangePassByUser('${String(acc.user || '').replace(/'/g, "\\'")}')">Password</button>
+          <button class="danger-btn" onclick="accDeleteByUser('${String(acc.user || '').replace(/'/g, "\\'")}')">${(translations[getLang()] && translations[getLang()].deleteAccount) || 'Delete'}</button>
         </div>
       </div>
-    `).join('') : `<div class="stored-question"><h4>${(translations[getLang()] && translations[getLang()].noExtraAccounts) || 'No extra accounts yet.'}</h4></div>`;
+    `).join('');
   };
 
   window.saveAccessAccountFromAdmin = function(){
-    try{
-      const user = (document.getElementById('accessAccountUser')?.value || '').trim();
-      const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
-      const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
-      if (!user || !pass){
-        alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
-        return;
-      }
-      const permissions = role === 'admin'
-        ? [...PERMISSIONS]
-        : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
-      if (role !== 'admin' && permissions.length === 0){
-        alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission for this staff account.');
-        return;
-      }
-      const accounts = getAccessAccounts();
-      const idx = accounts.findIndex(acc => accNorm(acc.user) === accNorm(user));
-      const payload = { user, pass, role, permissions };
-      if (idx >= 0) accounts[idx] = payload;
-      else accounts.push(payload);
-      setAccessAccounts(accounts);
-      const userEl = document.getElementById('accessAccountUser');
-      const passEl = document.getElementById('accessAccountPass');
-      const roleEl = document.getElementById('accessAccountRole');
-      if (userEl) userEl.value = '';
-      if (passEl) passEl.value = '';
-      if (roleEl) roleEl.value = 'user';
-      if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
-      renderAccessAccountsList();
-      alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
-    }catch(err){
-      alert((translations[getLang()] && translations[getLang()].accountSaveFailed) || 'Could not save account.');
+    const user = (document.getElementById('accessAccountUser')?.value || '').trim();
+    const pass = (document.getElementById('accessAccountPass')?.value || '').trim();
+    const role = (document.getElementById('accessAccountRole')?.value || 'user').trim();
+
+    if (!user || !pass){
+      alert((translations[getLang()] && translations[getLang()].usernamePasswordRequired) || 'Please enter username and password.');
+      return;
     }
+
+    const permissions = role === 'admin'
+      ? ((typeof defaultAdminPermissions === 'function') ? defaultAdminPermissions() : [...PERMISSIONS])
+      : Array.from(document.querySelectorAll('.perm-check:checked')).map(el => el.value);
+
+    if (role !== 'admin' && permissions.length === 0){
+      alert((translations[getLang()] && translations[getLang()].chooseOnePermission) || 'Please choose at least one permission for this staff account.');
+      return;
+    }
+
+    const list = editableAccounts();
+    const idx = list.findIndex(a => accNorm(a.user) === accNorm(user));
+    const payload = { user, pass, role, permissions };
+    if (idx >= 0) list[idx] = payload;
+    else list.push(payload);
+
+    saveEditableAccounts(list);
+
+    const userEl = document.getElementById('accessAccountUser');
+    const passEl = document.getElementById('accessAccountPass');
+    const roleEl = document.getElementById('accessAccountRole');
+    if (userEl) userEl.value = '';
+    if (passEl) passEl.value = '';
+    if (roleEl) roleEl.value = 'user';
+    if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
+    setTimeout(() => restorePermissions([]), 20);
+
+    renderAccessAccountsList();
+    alert((translations[getLang()] && translations[getLang()].accountSaved) || 'Account saved.');
   };
 
-  function bindAccountFix(){
+  function bindAccountSystem(){
     const saveBtn = document.getElementById('saveAccessAccountBtn');
-    if (saveBtn && !saveBtn.dataset.accfix){
+    if (saveBtn && !saveBtn.dataset.v3810){
       const fresh = saveBtn.cloneNode(true);
       saveBtn.parentNode.replaceChild(fresh, saveBtn);
-      fresh.dataset.accfix = '1';
+      fresh.dataset.v3810 = '1';
       fresh.addEventListener('click', function(e){
         e.preventDefault();
         e.stopPropagation();
         saveAccessAccountFromAdmin();
       });
     }
-    const role = document.getElementById('accessAccountRole');
-    if (role && !role.dataset.accfix){
-      role.dataset.accfix = '1';
-      role.addEventListener('change', function(){
+    const roleEl = document.getElementById('accessAccountRole');
+    if (roleEl && !roleEl.dataset.v3810){
+      roleEl.dataset.v3810 = '1';
+      roleEl.addEventListener('change', function(){
         if (typeof renderAccessPermissions === 'function') renderAccessPermissions([]);
       });
     }
@@ -1099,12 +1167,12 @@ function isDuplicateQuestionEnhanced(text, list){
   }
 
   window.addEventListener('load', function(){
-    setTimeout(bindAccountFix, 120);
+    setTimeout(bindAccountSystem, 120);
     const adminBtn = document.getElementById('adminLoginBtn');
-    if (adminBtn && !adminBtn.dataset.accfix){
-      adminBtn.dataset.accfix = '1';
+    if (adminBtn && !adminBtn.dataset.v3810){
+      adminBtn.dataset.v3810 = '1';
       adminBtn.addEventListener('click', function(){
-        setTimeout(bindAccountFix, 220);
+        setTimeout(bindAccountSystem, 220);
       });
     }
   });
