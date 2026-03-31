@@ -469,3 +469,16 @@ body[data-lang="ar"] .lang-btn{font-family:"Cairo","Baloo 2",sans-serif;}
   font-size:.92rem;
   margin:8px 0 10px;
 }
+
+
+/* v38.12 pro access account manager */
+.access-account-actions{gap:10px;flex-wrap:wrap}
+.account-status-note{min-height:24px;margin:4px 0 10px;padding:0 2px;font-size:.95rem;font-weight:700;color:#5d718d}
+.account-status-note[data-state="success"]{color:#1f8f4d}
+.account-status-note[data-state="error"]{color:#cf3f3f}
+.account-status-note[data-state="info"]{color:#365b8c}
+.account-card.account-pro-card{border:1px solid rgba(36,68,111,.12);box-shadow:0 8px 20px rgba(36,68,111,.06)}
+.account-card .state-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#eef5ff;color:#365b8c;font-size:.8rem;font-weight:700}
+.account-card .role-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#f7f9fc;color:#24446f;font-size:.8rem;font-weight:700;text-transform:capitalize}
+.account-card .account-meta-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.account-card .account-name{font-size:1.05rem}

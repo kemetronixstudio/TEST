@@ -32,6 +32,7 @@ translations.en.user='User';
 translations.en.admin='Admin';
 translations.en.deleteAccount='Delete';
 translations.en.noExtraAccounts='No saved accounts yet.';
+translations.en.clearAccessAccountForm='Clear Form';
 translations.ar.bulkQuestionsTitle='استيراد أسئلة بالجملة';
 translations.ar.bulkQuestionsInfo='حمّل نموذج الإكسل الجاهز ثم املأه بالأسئلة وارفعه لإضافة عدد كبير من الأسئلة دفعة واحدة.';
 translations.ar.downloadExcelForm='تحميل نموذج الإكسل';
@@ -58,6 +59,7 @@ translations.ar.user='مستخدم';
 translations.ar.admin='مشرف';
 translations.ar.deleteAccount='حذف';
 translations.ar.noExtraAccounts='لا توجد حسابات محفوظة بعد.';
+translations.ar.clearAccessAccountForm='مسح النموذج';
 
 
 function normalizeQuestion(question){
@@ -1499,4 +1501,502 @@ function isDuplicateQuestionEnhanced(text, list){
     }
     setTimeout(bindAccessAccountManager, 150);
   });
+})();
+
+
+/* === v38.12 pro access account manager === */
+(function(){
+  const ACCOUNT_SESSION_KEY = 'kgEnglishAccessSessionV1';
+  const ACCOUNT_STATUS_AUTO_CLEAR_MS = 5000;
+  const accountSectionKey = 'accountManager';
+
+  function adminPageReady(){
+    return typeof document !== 'undefined' && document.body && document.body.dataset && document.body.dataset.page === 'admin';
+  }
+  function normUser(value){ return String(value || '').trim().toLowerCase(); }
+  function allPerms(){ return Array.isArray(PERMISSIONS) ? [...PERMISSIONS] : ['dashboard','levelVisibility','timerSettings','quizAccess','teacherTest','bulkQuestions','questionBank','classManager','accountManager']; }
+  function nonAdminPerms(){ return allPerms().filter(key => key !== accountSectionKey); }
+  function isAdminOnlyPermission(key){ return key === accountSectionKey; }
+  function statusEl(){ return document.getElementById('accessAccountsStatus'); }
+  function showAccountStatus(message, state){
+    const el = statusEl();
+    if (!el) return;
+    el.textContent = String(message || '').trim();
+    if (message){
+      el.dataset.state = state || 'info';
+      if (showAccountStatus._timer) clearTimeout(showAccountStatus._timer);
+      showAccountStatus._timer = setTimeout(function(){
+        if (el.textContent === message) {
+          el.textContent = '';
+          delete el.dataset.state;
+        }
+      }, ACCOUNT_STATUS_AUTO_CLEAR_MS);
+    } else {
+      delete el.dataset.state;
+    }
+  }
+
+  function builtInAdmins(){
+    const base = (typeof ADMINS !== 'undefined' && Array.isArray(ADMINS)) ? ADMINS : [];
+    return base.map(function(item){
+      return {
+        user: String(item.user || '').trim(),
+        pass: String(item.pass || '').trim(),
+        role: 'admin',
+        permissions: allPerms(),
+        builtIn: true,
+        originalUser: String(item.user || '').trim(),
+        builtInOverride: false
+      };
+    }).filter(function(item){ return !!item.user; });
+  }
+
+  function sanitizePermissions(role, permissions){
+    if (role === 'admin') return allPerms();
+    const allowed = new Set(nonAdminPerms());
+    return Array.from(new Set((Array.isArray(permissions) ? permissions : []).filter(function(key){ return allowed.has(key); })));
+  }
+
+  function sanitizeAccount(raw){
+    if (!raw) return null;
+    const user = String(raw.user || raw.username || '').trim();
+    const pass = String(raw.pass || raw.password || '').trim();
+    let role = String(raw.role || 'user').trim().toLowerCase();
+    if (role !== 'admin') role = 'user';
+    if (!user || !pass) return null;
+    const originalUser = String(raw.originalUser || user).trim();
+    const sanitized = {
+      user: user,
+      pass: pass,
+      role: role,
+      permissions: sanitizePermissions(role, raw.permissions),
+      originalUser: originalUser,
+      builtInOverride: !!raw.builtInOverride
+    };
+    if (sanitized.role === 'admin') sanitized.permissions = allPerms();
+    return sanitized;
+  }
+
+  const localStorageAdapter = {
+    mode: 'local-storage',
+    listAccounts: function(){
+      try{
+        const raw = (typeof getAccessAccounts === 'function') ? getAccessAccounts() : [];
+        return Array.isArray(raw) ? raw.map(sanitizeAccount).filter(Boolean) : [];
+      }catch(err){
+        console.error('Access account read failed', err);
+        return [];
+      }
+    },
+    saveAccounts: function(accounts){
+      const safe = Array.isArray(accounts) ? accounts.map(sanitizeAccount).filter(Boolean) : [];
+      if (typeof setAccessAccounts === 'function') setAccessAccounts(safe);
+      return safe;
+    }
+  };
+
+  function getAccountAdapter(){
+    const external = window.KGAccessAccountsAdapter;
+    if (external && typeof external.listAccounts === 'function' && typeof external.saveAccounts === 'function') return external;
+    return localStorageAdapter;
+  }
+  window.KGAccessAccountsAdapter = window.KGAccessAccountsAdapter || localStorageAdapter;
+
+  function loadEditableAccounts(){
+    return getAccountAdapter().listAccounts().map(sanitizeAccount).filter(Boolean);
+  }
+  function saveEditableAccountsPro(list){
+    return getAccountAdapter().saveAccounts((Array.isArray(list) ? list : []).map(sanitizeAccount).filter(Boolean));
+  }
+
+  function mergedAccounts(){
+    const map = new Map();
+    builtInAdmins().forEach(function(admin){
+      map.set(normUser(admin.originalUser || admin.user), { ...admin, builtIn: true, builtInOverride: false });
+    });
+    loadEditableAccounts().forEach(function(account){
+      const key = normUser(account.originalUser || account.user);
+      const builtIn = map.get(key);
+      if (builtIn){
+        map.set(key, {
+          ...builtIn,
+          ...account,
+          role: 'admin',
+          permissions: allPerms(),
+          builtIn: true,
+          builtInOverride: true,
+          originalUser: builtIn.originalUser || builtIn.user
+        });
+      } else {
+        map.set(normUser(account.user), { ...account, builtIn: false, builtInOverride: false, originalUser: account.user });
+      }
+    });
+    return Array.from(map.values()).sort(function(a,b){ return String(a.user || '').localeCompare(String(b.user || '')); });
+  }
+
+  function findAccountByUser(user){
+    return mergedAccounts().find(function(account){ return normUser(account.user) === normUser(user); }) || null;
+  }
+
+  function persistSession(account){
+    window.__currentAccessAccount = account || null;
+    try{
+      if (account) sessionStorage.setItem(ACCOUNT_SESSION_KEY, JSON.stringify({ user: account.user, originalUser: account.originalUser || account.user }));
+      else sessionStorage.removeItem(ACCOUNT_SESSION_KEY);
+    }catch(err){}
+  }
+  function restoreSession(){
+    try{
+      const raw = sessionStorage.getItem(ACCOUNT_SESSION_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed) return null;
+      const target = parsed.originalUser || parsed.user;
+      return mergedAccounts().find(function(account){
+        return normUser(account.originalUser || account.user) === normUser(target) || normUser(account.user) === normUser(parsed.user);
+      }) || null;
+    }catch(err){
+      return null;
+    }
+  }
+  function currentAccount(){ return window.__currentAccessAccount || null; }
+  function currentIsAdmin(){ return (currentAccount() && currentAccount().role === 'admin'); }
+
+  function permissionLabelSafe(key){
+    try{ return typeof permissionLabel === 'function' ? permissionLabel(key) : key; }
+    catch(err){ return key; }
+  }
+
+  window.getLoginAccount = function(user, pass){
+    const lookupUser = normUser(user);
+    const lookupPass = String(pass || '').trim();
+    if (!lookupUser || !lookupPass) return null;
+    return mergedAccounts().find(function(account){
+      return normUser(account.user) === lookupUser && String(account.pass || '').trim() === lookupPass;
+    }) || null;
+  };
+
+  window.applySectionPermissions = function(account){
+    const resolved = account || currentAccount() || null;
+    const perms = resolved && resolved.role === 'admin'
+      ? allPerms()
+      : sanitizePermissions('user', resolved && resolved.permissions ? resolved.permissions : []);
+    document.querySelectorAll('[data-section-key]').forEach(function(section){
+      const key = section.dataset.sectionKey;
+      const canShow = perms.includes(key) && (!isAdminOnlyPermission(key) || (resolved && resolved.role === 'admin'));
+      section.classList.toggle('hidden', !canShow);
+      section.style.display = canShow ? '' : 'none';
+    });
+  };
+
+  window.renderAccessPermissions = function(selected){
+    const wrap = document.getElementById('accessPermissionsWrap');
+    if (!wrap) return;
+    const role = String(document.getElementById('accessAccountRole')?.value || 'user').trim().toLowerCase();
+    if (role === 'admin'){
+      wrap.innerHTML = '<div class="muted-note">' + (getLang() === 'ar' ? 'المشرف يملك كل الصلاحيات بما فيها إدارة الحسابات.' : 'Admin gets full access, including account management.') + '</div>';
+      return;
+    }
+    const selectedSet = new Set(Array.isArray(selected) ? selected : []);
+    const items = nonAdminPerms().map(function(key){
+      return '<label class="level-toggle admin-toggle-row"><input type="checkbox" class="perm-check" value="' + key + '" ' + (selectedSet.has(key) ? 'checked' : '') + '><span>' + escapeHtml(permissionLabelSafe(key)) + '</span></label>';
+    }).join('');
+    wrap.innerHTML = items || '<div class="muted-note">' + (((translations[getLang()] || {}).noPermissionsAvailable) || 'No permissions available.') + '</div>';
+  };
+
+  function clearAccessAccountFormPro(){
+    const userEl = document.getElementById('accessAccountUser');
+    const passEl = document.getElementById('accessAccountPass');
+    const roleEl = document.getElementById('accessAccountRole');
+    const saveBtn = document.getElementById('saveAccessAccountBtn');
+    if (userEl){
+      userEl.value = '';
+      userEl.dataset.originalUser = '';
+      userEl.dataset.originalBuiltIn = '';
+    }
+    if (passEl) passEl.value = '';
+    if (roleEl) roleEl.value = 'user';
+    if (saveBtn) saveBtn.textContent = ((translations[getLang()] || {}).saveAccessAccount) || 'Save Account';
+    window.renderAccessPermissions([]);
+  }
+  window.clearAccessAccountForm = clearAccessAccountFormPro;
+
+  function normalizeEditableListForSave(list){
+    const seen = new Set();
+    return (Array.isArray(list) ? list : []).map(sanitizeAccount).filter(function(account){
+      if (!account) return false;
+      const key = normUser(account.originalUser || account.user);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function upsertEditableAccount(list, payload, options){
+    const next = Array.isArray(list) ? list.slice() : [];
+    const originalLookup = normUser((options && options.originalUser) || payload.originalUser || payload.user);
+    const userLookup = normUser(payload.user);
+    let replaced = false;
+    for (let i = 0; i < next.length; i += 1){
+      const item = sanitizeAccount(next[i]);
+      if (!item) continue;
+      const itemOriginal = normUser(item.originalUser || item.user);
+      const itemUser = normUser(item.user);
+      if (itemOriginal === originalLookup || itemUser === originalLookup || itemUser === userLookup){
+        next[i] = payload;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) next.push(payload);
+    return normalizeEditableListForSave(next);
+  }
+
+  window.accEditByUser = function(user){
+    if (!currentIsAdmin()){
+      showAccountStatus(getLang()==='ar' ? 'إدارة الحسابات متاحة للمشرف فقط.' : 'Only admins can manage accounts.', 'error');
+      return;
+    }
+    const account = findAccountByUser(user);
+    if (!account) return;
+    const userEl = document.getElementById('accessAccountUser');
+    const passEl = document.getElementById('accessAccountPass');
+    const roleEl = document.getElementById('accessAccountRole');
+    const saveBtn = document.getElementById('saveAccessAccountBtn');
+    if (userEl){
+      userEl.value = account.user || '';
+      userEl.dataset.originalUser = account.originalUser || account.user || '';
+      userEl.dataset.originalBuiltIn = account.builtIn ? '1' : '';
+    }
+    if (passEl) passEl.value = account.pass || '';
+    if (roleEl) roleEl.value = account.role || 'user';
+    if (saveBtn) saveBtn.textContent = getLang()==='ar' ? 'تحديث الحساب' : 'Update Account';
+    window.renderAccessPermissions(account.role === 'admin' ? [] : (account.permissions || []));
+    showAccountStatus(getLang()==='ar' ? 'يمكنك الآن تعديل الحساب ثم الضغط على حفظ.' : 'You can now modify the account and save.', 'info');
+  };
+
+  window.accDeleteByUser = function(user){
+    if (!currentIsAdmin()){
+      showAccountStatus(getLang()==='ar' ? 'إدارة الحسابات متاحة للمشرف فقط.' : 'Only admins can manage accounts.', 'error');
+      return;
+    }
+    const account = findAccountByUser(user);
+    if (!account) return;
+    let list = loadEditableAccounts();
+    if (account.builtIn){
+      if (!confirm(getLang()==='ar' ? 'سيتم حذف التعديل فقط والرجوع إلى بيانات المشرف الأساسية. هل تريد المتابعة؟' : 'This removes only the override and restores the built-in admin. Continue?')) return;
+      list = list.filter(function(item){ return normUser(item.originalUser || item.user) !== normUser(account.originalUser || account.user); });
+    } else {
+      if (!confirm(getLang()==='ar' ? 'هل تريد حذف هذا الحساب؟' : 'Delete this account?')) return;
+      list = list.filter(function(item){ return normUser(item.user) !== normUser(account.user); });
+    }
+    saveEditableAccountsPro(list);
+    clearAccessAccountFormPro();
+    window.renderAccessAccountsList();
+    showAccountStatus(getLang()==='ar' ? 'تم حذف الحساب بنجاح.' : 'Account deleted successfully.', 'success');
+  };
+
+  window.accChangePassByUser = function(user){
+    if (!currentIsAdmin()){
+      showAccountStatus(getLang()==='ar' ? 'إدارة الحسابات متاحة للمشرف فقط.' : 'Only admins can manage accounts.', 'error');
+      return;
+    }
+    const account = findAccountByUser(user);
+    if (!account) return;
+    const nextPass = prompt(getLang()==='ar' ? 'أدخل كلمة المرور الجديدة' : 'New password:', account.pass || '');
+    if (!nextPass) return;
+    const payload = sanitizeAccount({
+      user: account.user,
+      pass: nextPass,
+      role: account.role,
+      permissions: account.role === 'admin' ? allPerms() : account.permissions,
+      originalUser: account.originalUser || account.user,
+      builtInOverride: !!account.builtIn
+    });
+    let list = loadEditableAccounts();
+    list = upsertEditableAccount(list, payload, { originalUser: account.originalUser || account.user });
+    saveEditableAccountsPro(list);
+    window.renderAccessAccountsList();
+    showAccountStatus(getLang()==='ar' ? 'تم تحديث كلمة المرور بنجاح.' : 'Password updated successfully.', 'success');
+  };
+
+  window.renderAccessAccountsList = function(){
+    const box = document.getElementById('accessAccountsList');
+    if (!box) return;
+    if (!currentIsAdmin()){
+      box.innerHTML = '<div class="stored-question"><h4>' + (getLang()==='ar' ? 'إدارة الحسابات متاحة للمشرف فقط.' : 'Account management is available to admins only.') + '</h4></div>';
+      return;
+    }
+    const accounts = mergedAccounts();
+    if (!accounts.length){
+      box.innerHTML = '<div class="stored-question"><h4>' + ((((translations[getLang()] || {}).noExtraAccounts)) || 'No accounts yet.') + '</h4></div>';
+      return;
+    }
+    box.innerHTML = accounts.map(function(account){
+      const safeUser = String(account.user || '').replace(/'/g, "\\'");
+      const roleText = account.role === 'admin' ? (((translations[getLang()] || {}).adminRole) || 'Admin') : (((translations[getLang()] || {}).staffRole) || 'Staff');
+      const stateText = account.builtIn
+        ? (account.builtInOverride ? (getLang()==='ar' ? 'مشرف أساسي + تعديل' : 'Built-in + Override') : (getLang()==='ar' ? 'مشرف أساسي' : 'Built-in'))
+        : (getLang()==='ar' ? 'حساب مخصص' : 'Custom account');
+      const perms = account.role === 'admin'
+        ? (getLang()==='ar' ? 'كل الصلاحيات' : 'Full access')
+        : ((account.permissions || []).map(permissionLabelSafe).join(', ') || '-');
+      return '<div class="account-card account-realfix-card account-pro-card">'
+        + '<div class="account-meta-top"><strong class="account-name">' + escapeHtml(account.user || '') + '</strong><div class="account-badges"><span class="role-badge">' + escapeHtml(roleText) + '</span> <span class="state-badge">' + escapeHtml(stateText) + '</span></div></div>'
+        + '<div class="account-perms-line">' + escapeHtml(perms) + '</div>'
+        + '<div class="account-actions">'
+        + '<button class="ghost-btn" type="button" onclick="accEditByUser(\'' + safeUser + '\')">' + (getLang()==='ar' ? 'تعديل' : 'Edit') + '</button>'
+        + '<button class="ghost-btn" type="button" onclick="accChangePassByUser(\'' + safeUser + '\')">' + (getLang()==='ar' ? 'كلمة المرور' : 'Password') + '</button>'
+        + '<button class="danger-btn" type="button" onclick="accDeleteByUser(\'' + safeUser + '\')">' + ((((translations[getLang()] || {}).deleteAccount)) || 'Delete') + '</button>'
+        + '</div></div>';
+    }).join('');
+  };
+
+  window.saveAccessAccountFromAdmin = function(){
+    if (!currentIsAdmin()){
+      showAccountStatus(getLang()==='ar' ? 'إدارة الحسابات متاحة للمشرف فقط.' : 'Only admins can manage accounts.', 'error');
+      return false;
+    }
+    const userEl = document.getElementById('accessAccountUser');
+    const passEl = document.getElementById('accessAccountPass');
+    const roleEl = document.getElementById('accessAccountRole');
+    const user = String(userEl?.value || '').trim();
+    const pass = String(passEl?.value || '').trim();
+    const role = String(roleEl?.value || 'user').trim().toLowerCase() === 'admin' ? 'admin' : 'user';
+    const originalUser = String(userEl?.dataset.originalUser || '').trim();
+    const originalBuiltIn = String(userEl?.dataset.originalBuiltIn || '') === '1';
+
+    if (!user || !pass){
+      showAccountStatus((((translations[getLang()] || {}).usernamePasswordRequired)) || 'Please enter username and password.', 'error');
+      return false;
+    }
+
+    const builtInConflict = builtInAdmins().find(function(account){ return normUser(account.user) === normUser(user); }) || null;
+    let permissions = role === 'admin'
+      ? allPerms()
+      : Array.from(document.querySelectorAll('.perm-check:checked')).map(function(el){ return el.value; });
+    permissions = sanitizePermissions(role, permissions);
+    if (role !== 'admin' && permissions.length === 0){
+      showAccountStatus((((translations[getLang()] || {}).chooseOnePermission)) || 'Please choose at least one permission for this staff account.', 'error');
+      return false;
+    }
+
+    let payload = sanitizeAccount({
+      user: user,
+      pass: pass,
+      role: role,
+      permissions: permissions,
+      originalUser: originalBuiltIn ? (originalUser || user) : user,
+      builtInOverride: originalBuiltIn
+    });
+
+    let list = loadEditableAccounts();
+    if (originalBuiltIn || builtInConflict){
+      const builtInBase = builtInConflict || builtInAdmins().find(function(account){ return normUser(account.originalUser || account.user) === normUser(originalUser || user); });
+      payload = sanitizeAccount({
+        user: user,
+        pass: pass,
+        role: 'admin',
+        permissions: allPerms(),
+        originalUser: (builtInBase && (builtInBase.originalUser || builtInBase.user)) || originalUser || user,
+        builtInOverride: true
+      });
+      list = upsertEditableAccount(list, payload, { originalUser: payload.originalUser });
+    } else {
+      payload = sanitizeAccount({
+        user: user,
+        pass: pass,
+        role: role,
+        permissions: permissions,
+        originalUser: originalUser || user,
+        builtInOverride: false
+      });
+      list = upsertEditableAccount(list, payload, { originalUser: originalUser || user });
+    }
+
+    saveEditableAccountsPro(list);
+    clearAccessAccountFormPro();
+    window.renderAccessAccountsList();
+    showAccountStatus((((translations[getLang()] || {}).accountSaved)) || 'Account saved.', 'success');
+    return true;
+  };
+
+  function openAdminPanel(account){
+    const loginCard = document.getElementById('adminLoginCard');
+    const panel = document.getElementById('adminPanel');
+    if (!account || !loginCard || !panel) return;
+    persistSession(account);
+    loginCard.classList.add('hidden');
+    panel.classList.remove('hidden');
+    window.applySectionPermissions(account);
+    if (typeof populateDashboardDateFilter === 'function') populateDashboardDateFilter();
+    if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+    if (typeof renderLevelVisibilityEditor === 'function') renderLevelVisibilityEditor();
+    if (typeof renderTimerSettingsEditor === 'function') renderTimerSettingsEditor();
+    if (typeof renderQuizAccessEditor === 'function') renderQuizAccessEditor();
+    if (typeof renderTeacherTestEditor === 'function') renderTeacherTestEditor();
+    if (typeof renderTeacherQuestionPicker === 'function') renderTeacherQuestionPicker();
+    if (typeof wireCollapseButtons === 'function') wireCollapseButtons();
+    if (typeof wireQuestionFilterButtons === 'function') wireQuestionFilterButtons();
+    window.renderAccessPermissions([]);
+    window.renderAccessAccountsList();
+  }
+
+  function handleLoginClick(event){
+    event.preventDefault();
+    const user = document.getElementById('adminUser')?.value || '';
+    const pass = document.getElementById('adminPass')?.value || '';
+    const account = window.getLoginAccount(user, pass);
+    if (!account){
+      alert(getLang()==='ar' ? 'اسم المشرف أو كلمة المرور غير صحيحة.' : 'Wrong admin name or password.');
+      return;
+    }
+    openAdminPanel(account);
+  }
+
+  function replaceNodeWithClone(id){
+    const node = document.getElementById(id);
+    if (!node || !node.parentNode) return node;
+    const clone = node.cloneNode(true);
+    node.parentNode.replaceChild(clone, node);
+    return clone;
+  }
+
+  function bindProAccountManager(){
+    if (!adminPageReady()) return;
+
+    const loginBtn = replaceNodeWithClone('adminLoginBtn');
+    if (loginBtn) loginBtn.addEventListener('click', handleLoginClick);
+
+    const saveBtn = replaceNodeWithClone('saveAccessAccountBtn');
+    if (saveBtn) saveBtn.addEventListener('click', function(event){
+      event.preventDefault();
+      window.saveAccessAccountFromAdmin();
+    });
+
+    const clearBtn = replaceNodeWithClone('clearAccessAccountBtn');
+    if (clearBtn) clearBtn.addEventListener('click', function(event){
+      event.preventDefault();
+      clearAccessAccountFormPro();
+      showAccountStatus(getLang()==='ar' ? 'تم مسح النموذج.' : 'Form cleared.', 'info');
+    });
+
+    const roleEl = replaceNodeWithClone('accessAccountRole');
+    if (roleEl) roleEl.addEventListener('change', function(){
+      window.renderAccessPermissions(Array.from(document.querySelectorAll('.perm-check:checked')).map(function(el){ return el.value; }));
+    });
+
+    const restored = restoreSession();
+    if (restored) openAdminPanel(restored);
+    else {
+      window.applySectionPermissions(currentAccount());
+      window.renderAccessPermissions([]);
+      window.renderAccessAccountsList();
+    }
+  }
+
+  if (adminPageReady()) {
+    setTimeout(bindProAccountManager, 0);
+    window.addEventListener('load', bindProAccountManager);
+  }
 })();

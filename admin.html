@@ -135,7 +135,8 @@
         <select id="accessAccountRole"><option value="user" data-i18n="staffRole">Staff</option><option value="admin" data-i18n="adminRole">Admin</option></select>
       </div>
       <div id="accessPermissionsWrap" class="permissions-grid"></div>
-      <div class="action-row"><button class="main-btn" id="saveAccessAccountBtn" data-i18n="saveAccessAccount">Save Account</button></div>
+      <div class="action-row access-account-actions"><button class="main-btn" id="saveAccessAccountBtn" data-i18n="saveAccessAccount">Save Account</button><button class="ghost-btn" id="clearAccessAccountBtn" type="button" data-i18n="clearAccessAccountForm">Clear Form</button></div>
+      <div id="accessAccountsStatus" class="account-status-note" aria-live="polite"></div>
       <div id="accessAccountsList" class="stored-questions"></div>
     </section>
 
