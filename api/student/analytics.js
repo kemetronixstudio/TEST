@@ -1,8 +1,7 @@
 
 function withCors(handler){
   return async function(req, res){
-    applyCors(req, res);
-    return handler(req, res);
+        return handler(req, res);
   };
 }
 
@@ -12,8 +11,7 @@ const { applyCors, setAuthCookie } = require('../../lib/api-security');
 
 
 module.exports = withCors(async function handler(req, res) {
-  if (applyCors(req, res)) return;
-  try {
+    try {
     const auth = await access.requireAuthorized(req, 'dashboard');
     if (!auth.ok) {
       res.statusCode = auth.status;

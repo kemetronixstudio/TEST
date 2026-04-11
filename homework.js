@@ -33,6 +33,10 @@
   async function verifyStudent(showStatus){
     const studentId = String($('homeworkStudentId')?.value || '').trim();
     const pin = String($('homeworkStudentPin')?.value || '').trim();
+    if (!studentId || !pin) {
+      if (showStatus) setStatus('Please enter student ID and PIN first.');
+      throw new Error('Please enter student ID and PIN first.');
+    }
     const data = await api('identify-student', { method:'POST', body: JSON.stringify({ studentId, pin }) });
     state = state || {};
     state.identity = Object.assign({}, data.student || {}, { pin });
@@ -44,6 +48,14 @@
 
   async function renderAssignments(){
     try {
+      const sid = String($('homeworkStudentId')?.value || '').trim();
+      const pin = String($('homeworkStudentPin')?.value || '').trim();
+      if (!sid || !pin) {
+        availableRows = [];
+        $('homeworkAvailableList').innerHTML = '';
+        setStatus('Please enter student ID and PIN first.');
+        return;
+      }
       const identity = await verifyStudent(false);
       const data = await api('available', { method:'POST', body: JSON.stringify({ identity }) });
       availableRows = Array.isArray(data.rows) ? data.rows : [];
@@ -166,9 +178,12 @@
     }
     updateQuizHead();
     timer = setInterval(() => {
-      state.timeLeft -= 1;
+      state.timeLeft = Math.max(0, Number(state.timeLeft || 0) - 1);
       updateQuizHead();
-      if (state.timeLeft <= 0) finishHomework(true);
+      if (state.timeLeft <= 0) {
+        stopTimer();
+        finishHomework(true);
+      }
     }, 1000);
   }
 
@@ -203,7 +218,9 @@
               answers: submitData.result.answers
             }
           });
-        } catch (error) {}
+        } catch (error) {
+          setStatus('Homework submitted locally, but cloud sync failed.');
+        }
       }
 
       $('homeworkQuizSection').classList.add('hidden');

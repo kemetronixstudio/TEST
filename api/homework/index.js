@@ -1,8 +1,7 @@
 
 function withCors(handler){
   return async function(req, res){
-    applyCors(req, res);
-    return handler(req, res);
+        return handler(req, res);
   };
 }
 
@@ -12,8 +11,7 @@ const { applyCors, setAuthCookie } = require('../../lib/api-security');
 
 
 module.exports = withCors(async function handler(req, res) {
-  if (applyCors(req, res)) return;
-  res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Type', 'application/json');
   try {
     const url = new URL(req.url || '/api/homework', 'http://localhost');
     const action = String(url.searchParams.get('action') || '').trim().toLowerCase();

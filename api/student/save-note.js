@@ -1,8 +1,7 @@
 
 function withCors(handler){
   return async function(req, res){
-    applyCors(req, res);
-    return handler(req, res);
+        return handler(req, res);
   };
 }
 
@@ -12,8 +11,7 @@ const { applyCors, setAuthCookie } = require('../../lib/api-security');
 
 
 module.exports = withCors(async function handler(req, res) {
-  if (applyCors(req, res)) return;
-  if (req.method !== 'POST') {
+    if (req.method !== 'POST') {
     res.statusCode = 405;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ ok: false, error: 'Method not allowed' }));

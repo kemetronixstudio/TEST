@@ -1,4 +1,5 @@
 
+(function(){
 function parentEsc(value){
   if (typeof escapeHtml === 'function') return escapeHtml(value);
   return String(value == null ? '' : value)

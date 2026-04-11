@@ -60,4 +60,12 @@
   </section>
 </main>
 <div id="confettiLayer"></div>
-<script src="student-cloud-client.js"></script><script src="js/app-core.js"></script></body></html>
+<script>
+(function(){
+  try {
+    var params = new URLSearchParams(location.search);
+    var grade = String(params.get('grade') || '').trim().toLowerCase();
+    if (grade) document.body.dataset.grade = grade;
+  } catch (e) {}
+})();
+</script><script src="student-cloud-client.js"></script><script src="js/app-core.js"></script></body></html>

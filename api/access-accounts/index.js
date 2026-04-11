@@ -1,8 +1,7 @@
 
 function withCors(handler){
   return async function(req, res){
-    applyCors(req, res);
-    return handler(req, res);
+        return handler(req, res);
   };
 }
 
@@ -38,8 +37,7 @@ function readBody(req) {
 }
 
 module.exports = withCors(async function handler(req, res) {
-  if (applyCors(req, res)) return;
-  try {
+    try {
     const action = getAction(req);
 
     if (req.method === 'GET') {
