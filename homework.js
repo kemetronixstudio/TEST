@@ -207,7 +207,7 @@
         try {
           await studentCloud.submitResult({
             identity: state.identity,
-            quizKey: `HOMEWORK|${state.assignment.id}|${submitData.submission.id}`,
+            quizKey: (studentCloud && typeof studentCloud.buildQuizKey === 'function') ? studentCloud.buildQuizKey({ grade: String((state.assignment.grade||'HOMEWORK')).toUpperCase(), count: Number((state.assignment.questions||[]).length||0), label: 'homework-' + String(state.assignment.id||submitData.submission.id||'task') }) : `HOMEWORK|${state.assignment.id}|${submitData.submission.id}`,
             result: submitData.result,
             state: {
               completed: true,

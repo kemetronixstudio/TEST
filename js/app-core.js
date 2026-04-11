@@ -521,7 +521,7 @@ function saveAccessAccountFromAdmin(){
     const idx = accounts.findIndex(acc => String(acc.username).toLowerCase() === user.toLowerCase());
     const payload = { username:user, password:pass, role, permissions };
     if (idx >= 0) accounts[idx] = payload; else accounts.push(payload);
-    if (setAccessAccounts) setAccessAccounts(accounts); else localStorage.setItem('kgEnglishAccessAccountsV26', JSON.stringify(accounts));
+    if (setAccessAccounts) setAccessAccounts(accounts); else localStorage.setItem(storeKeys.accessAccounts, JSON.stringify(accounts));
     renderAccessAccountsList && renderAccessAccountsList();
     const userEl = document.getElementById('accessAccountUser'); if (userEl) userEl.value = '';
     const passEl = document.getElementById('accessAccountPass'); if (passEl) passEl.value = '';
@@ -969,11 +969,11 @@ function initQuiz(){
     try { await studentCloud.saveProgress({ identity: studentProfile, quizKey: currentQuizKey, state: serializeQuizState(false) }); }
     catch (error) { console.warn('cloud progress save failed', error); }
   }
-  function promptForQuizPassword(){
+  async function promptForQuizPassword(){
     const access = getQuizAccess()[grade] || {enabled:false,password:''};
     if (!access.enabled || !access.password) return true;
-    const entered = window.askTextInput(`This quiz is protected. Enter password. If you do not know it, contact Dr. Tarek 01`) || '';
-    if (entered !== access.password){ alert('Wrong password. Contact Dr. Tarek 01'); return false; }
+    const entered = await window.askTextInput(`This quiz is protected. Enter password. If you do not know it, contact Dr. Tarek 01`) || '';
+    if (String(entered) !== String(access.password)){ alert('Wrong password. Contact Dr. Tarek 01'); return false; }
     return true;
   }
   function updateTeacherTestLaunch(){
@@ -988,7 +988,7 @@ function initQuiz(){
       testLaunchWrap.classList.add('hidden');
     }
   }
-  goBtn?.addEventListener('click', ()=>{ const v = studentNameInput.value.trim(); if (!v){ alert(translations[getLang()].enterNameAlert); return; } try { studentProfile = collectStudentIdentity(); } catch (error) { alert(error.message || 'Please complete the student details.'); return; } if (!promptForQuizPassword()) return; studentName = v; levelChooser.classList.remove('hidden'); updateTeacherTestLaunch(); studentNameInput.disabled = true; goBtn.disabled = true; updateHistory(); });
+  goBtn?.addEventListener('click', async ()=>{ const v = studentNameInput.value.trim(); if (!v){ alert(translations[getLang()].enterNameAlert); return; } try { studentProfile = collectStudentIdentity(); } catch (error) { alert(error.message || 'Please complete the student details.'); return; } if (!(await promptForQuizPassword())) return; studentName = v; levelChooser.classList.remove('hidden'); updateTeacherTestLaunch(); studentNameInput.disabled = true; goBtn.disabled = true; updateHistory(); });
   levelBtns.forEach((btn)=> btn.addEventListener('click', async ()=>{ selectedCount = Number(btn.dataset.count); const levelMap = {10:'level1',20:'level2',30:'level3',40:'level4',50:'level5'}; selectedLevelLabel = translations[getLang()][levelMap[selectedCount] || 'level1']; activeTestConfig = null; await startQuiz(); }));
   startAssignedTestBtn?.addEventListener('click', async ()=>{ if (!activeTestConfig) return; selectedCount = Number(activeTestConfig.count || 10); selectedLevelLabel = activeTestConfig.name || 'Teacher Test'; await startQuiz(); });
   nextBtn?.addEventListener('click', goNext);
@@ -1260,7 +1260,7 @@ function clearTeacherTestFromAdmin(){
   renderTeacherTestEditor();
 }
 
-function addCustomQuestion(){ const grade = ($('#newQGrade').value || '').trim().toLowerCase(); const skill = $('#newQSkill').value.trim() || 'Vocabulary'; const type = $('#newQType').value.trim() || 'Choice'; const text = $('#newQText').value.trim(); const options = ($('#newQOptions').value || '').split('|').map(s=>s.trim()).filter(Boolean); const answer = $('#newQAnswer').value.trim(); const difficulty = clamp(Number($('#newQDifficulty').value || 1),1,3); const image = ($('#newQImage').value || '').trim() || $('#newQImageFile').dataset.savedImage || null; if (!['kg1','kg2'].includes(grade) || !text || !options.length || !answer){ alert('Please fill grade, question text, options, and answer.'); return; } const custom = getCustomQuestions(); custom[grade].push({grade:grade.toUpperCase(), skill, type, text, options, answer, image, difficulty}); writeJson(storeKeys.customQuestions, custom); ['#newQGrade','#newQSkill','#newQType','#newQText','#newQOptions','#newQAnswer','#newQDifficulty','#newQImage'].forEach(id=> $(id).value=''); $('#newQImageFile').value=''; $('#newQImageFile').dataset.savedImage=''; renderStoredQuestions(); alert('Question added.'); }
+function addCustomQuestion(){ const grade = ($('#newQGrade').value || '').trim().toLowerCase(); const skill = $('#newQSkill').value.trim() || 'Vocabulary'; const type = $('#newQType').value.trim() || 'Choice'; const text = $('#newQText').value.trim(); const options = ($('#newQOptions').value || '').split('|').map(s=>s.trim()).filter(Boolean); const answer = $('#newQAnswer').value.trim(); const difficulty = clamp(Number($('#newQDifficulty').value || 1),1,3); const image = ($('#newQImage').value || '').trim() || $('#newQImageFile').dataset.savedImage || null; const validGrades = ['kg1','kg2','grade1','grade2','grade3','grade4','grade5','grade6'].concat((typeof window.getClasses==='function' ? window.getClasses().map(c => String(c.key||'').toLowerCase()) : [])); if (!validGrades.includes(grade) || !text || !options.length || !answer){ alert('Please fill grade, question text, options, and answer.'); return; } const custom = getCustomQuestions(); if (!custom[grade]) custom[grade] = []; custom[grade].push({grade:grade.toUpperCase(), skill, type, text, options, answer, image, difficulty}); writeJson(storeKeys.customQuestions, custom); ['#newQGrade','#newQSkill','#newQType','#newQText','#newQOptions','#newQAnswer','#newQDifficulty','#newQImage'].forEach(id=> $(id).value=''); $('#newQImageFile').value=''; $('#newQImageFile').dataset.savedImage=''; renderStoredQuestions(); alert('Question added.'); }
 function questionEditorCard(question){ const meta = question._meta; const opts = (question.options || []).join(' | '); const srcLabel = meta.source === 'base' ? 'Base' : 'Custom'; return `<div class="question-edit-card" data-qid="${meta.id}" data-grade="${question.grade || meta.grade.toUpperCase()}"><div class="meta-line"><span>${question.grade || meta.grade.toUpperCase()}</span><span>${question.skill || '-'}</span><span>${question.type || 'Choice'}</span><span>${srcLabel}</span></div><div class="question-edit-grid"><textarea class="qe-text full">${question.text || ''}</textarea><input class="qe-skill" value="${question.skill || ''}" placeholder="Skill"><input class="qe-type" value="${question.type || ''}" placeholder="Type"><textarea class="qe-options full" placeholder="Options separated by |">${opts}</textarea><input class="qe-answer" value="${question.answer || ''}" placeholder="Answer"><input class="qe-difficulty" value="${question.difficulty || 1}" placeholder="Difficulty 1-3"><input class="qe-image full" value="${question.image || ''}" placeholder="Image filename or data URL"></div><div class="question-edit-actions"><button class="main-btn save-question-btn">Save Changes</button><button class="ghost-btn reset-question-btn">Reset</button><button class="danger-btn delete-question-btn">${((translations[getLang()] || {}).deleteQuestion) || 'Delete'}</button></div></div>`; }
 function bindQuestionEditorActions(){ document.querySelectorAll('[data-filter-grade]').forEach(btn => btn.onclick = ()=>{ document.querySelectorAll('[data-filter-grade]').forEach(b=>b.classList.toggle('active', b===btn)); const grade = btn.dataset.filterGrade; document.querySelectorAll('.question-edit-card').forEach(card=>{ card.style.display = grade === 'all' || card.dataset.grade === grade ? '' : 'none'; }); }); document.querySelectorAll('.save-question-btn').forEach(btn => btn.onclick = ()=> saveQuestionEdits(btn.closest('.question-edit-card'))); document.querySelectorAll('.reset-question-btn').forEach(btn => btn.onclick = ()=> resetQuestionEdits(btn.closest('.question-edit-card'))); document.querySelectorAll('.delete-question-btn').forEach(btn => btn.onclick = ()=> deleteQuestionEdits(btn.closest('.question-edit-card'))); }
 function saveQuestionEdits(card){ if (!card) return; const id = card.dataset.qid; const grade = (card.dataset.grade || 'KG1').toLowerCase(); const payload = { text: $('.qe-text',card).value.trim(), skill: $('.qe-skill',card).value.trim() || 'Vocabulary', type: $('.qe-type',card).value.trim() || 'Choice', options: $('.qe-options',card).value.split('|').map(s=>s.trim()).filter(Boolean), answer: $('.qe-answer',card).value.trim(), difficulty: clamp(Number($('.qe-difficulty',card).value || 1),1,3), image: $('.qe-image',card).value.trim() || null }; if (!payload.text || !payload.options.length || !payload.answer){ alert('Question text, options, and answer are required.'); return; } const overrides = getQuestionOverrides(); overrides[id] = payload; writeJson(storeKeys.questionOverrides, overrides); alert('Question updated.'); }
@@ -1277,7 +1277,8 @@ function registerPwa(){
 window.addEventListener('pagehide', ()=>{ try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch(e){} });
 document.addEventListener('visibilitychange', ()=>{ if (document.hidden) { try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch(e){} } });
 window.translations = translations; window.initQuiz = initQuiz;
-initThemeButtons(); initLangButtons(); applyTranslations(); renderHomeProgress(); initQuiz(); renderCertificate(); initAdmin(); registerPwa();
+function bootAppCore(){ initThemeButtons(); initLangButtons(); applyTranslations(); renderHomeProgress(); initQuiz(); renderCertificate(); initAdmin(); registerPwa(); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootAppCore, {once:true}); else bootAppCore();
 
 window.addEventListener('error', (event) => { try { console.error('App error', event.error || event.message); } catch(e){} });
 window.addEventListener('unhandledrejection', (event) => { try { console.error('Unhandled promise rejection', event.reason); } catch(e){} });
@@ -1619,7 +1620,7 @@ function isDuplicateQuestionEnhanced(text, list){
   };
 
   window.accChangePassByUser = async function(user){
-    const next = askTextInput((typeof getLang === 'function' && getLang() === 'ar') ? 'أدخل كلمة المرور الجديدة' : 'New password:');
+    const next = await askTextInput((typeof getLang === 'function' && getLang() === 'ar') ? 'أدخل كلمة المرور الجديدة' : 'New password:');
     if (!next) return;
     let list = editableAccounts();
     const idx = list.findIndex(a => accNorm(a.user) === accNorm(user));
@@ -1908,7 +1909,7 @@ function isDuplicateQuestionEnhanced(text, list){
     }
     const acc = combinedAccounts().find(a => accNorm(a.user) === accNorm(user));
     if (!acc) return;
-    const next = askTextInput(getLang()==='ar' ? 'أدخل كلمة المرور الجديدة' : 'New password:', acc.pass || '');
+    const next = await askTextInput(getLang()==='ar' ? 'أدخل كلمة المرور الجديدة' : 'New password:', acc.pass || '');
     if (!next) return;
     let list = editableAccounts();
     if (acc.builtIn){
@@ -3788,8 +3789,8 @@ try {
   function lang(){ return (localStorage.getItem('kgAppLang') || 'en') === 'ar' ? 'ar' : 'en'; }
   function T(key){ return (txt[lang()] && txt[lang()][key]) || (txt.en && txt.en[key]) || key; }
   
-/* duplicate helper removed during cleanup */
-)();
+window.__cleanupNoop = true;
+})();
 
 /* === v38.11 quiz visibility controls === */
 (function(){
@@ -3798,8 +3799,8 @@ try {
   const KEY_TESTS = 'kgEnglishTeacherTestsV23';
 
   
-/* duplicate helper removed during cleanup */
-)();
+window.__cleanupNoop = true;
+})();
 
 /* === v38.12 status badges + question bank class fixes === */
 (function(){
@@ -3810,8 +3811,8 @@ try {
   const VALID_STATUSES = ['visible','hidden','frozen'];
 
   
-/* duplicate helper removed during cleanup */
-)();
+window.__cleanupNoop = true;
+})();
 
 (function(){
   const GRADE_CARD_I18N = {
@@ -3912,7 +3913,7 @@ try {
     });
   }
 
-  function appendCountNote(){ return;
+  function appendCountNote(){
 
     const grid = document.getElementById('homeLevelsGrid');
     if (!grid) return;
@@ -3968,8 +3969,8 @@ try {
   };
 
   
-/* duplicate helper removed during cleanup */
-)();
+window.__cleanupNoop = true;
+})();
 
 /* ---- END hobby-upgrades.js ---- */
 
@@ -4179,7 +4180,8 @@ try {
   var heartbeatTimer = setInterval(function(){
     heartbeat();
     try {
-      if (document.body && document.body.dataset && document.body.dataset.quizInitGuard) {
+      var page = document.body && document.body.dataset ? document.body.dataset.page : '';
+      if ((page === 'quiz' && document.body.dataset.quizInitGuard) || page !== 'quiz') {
         clearInterval(heartbeatTimer);
       }
     } catch (e) {}
@@ -4194,8 +4196,8 @@ try {
   const LABELS = {kg1:'KG1',kg2:'KG2',grade1:'Grade 1',grade2:'Grade 2',grade3:'Grade 3',grade4:'Grade 4',grade5:'Grade 5',grade6:'Grade 6'};
 
   
-/* duplicate helper removed during cleanup */
-)();
+window.__cleanupNoop = true;
+})();
 
 /* ---- END runtime-ui-fixes.js ---- */
 
@@ -4358,3 +4360,28 @@ document.addEventListener('click', function(e){
   e.preventDefault();
   window.saveClassManagerFromAdmin();
 });
+
+(function(){
+  const KEY_CLASSES = 'kgEnglishCustomClassesV29';
+  function readCustomClassesStore(){
+    try {
+      const rows = JSON.parse(localStorage.getItem(KEY_CLASSES) || '[]');
+      return Array.isArray(rows) ? rows : [];
+    } catch (e) { return []; }
+  }
+  function normalizeCustomClass(row){
+    row = row || {};
+    const rawKey = String(row.key || row.grade || row.id || '').trim().toLowerCase();
+    const key = rawKey.replace(/[^a-z0-9]+/g, '');
+    const name = String(row.name || row.label || row.title || row.grade || '').trim();
+    if (!key || !name) return null;
+    return { key:key, name:name, label:name, title:name };
+  }
+  window.getCustomClasses = function(){ return readCustomClassesStore().map(normalizeCustomClass).filter(Boolean); };
+  window.getClasses = function(){ return window.getCustomClasses(); };
+  window.saveCustomClasses = function(rows){
+    const safe = (Array.isArray(rows) ? rows : []).map(normalizeCustomClass).filter(Boolean);
+    try { localStorage.setItem(KEY_CLASSES, JSON.stringify(safe)); } catch (e) {}
+    return safe;
+  };
+})();

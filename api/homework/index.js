@@ -1,7 +1,8 @@
 
 function withCors(handler){
   return async function(req, res){
-        return handler(req, res);
+    if (applyCors(req, res)) return;
+    return handler(req, res);
   };
 }
 
@@ -108,4 +109,4 @@ module.exports = withCors(async function handler(req, res) {
   } catch (error) {
     res.statusCode = error.status || 400; res.end(JSON.stringify({ ok:false, error:error.message || 'Request failed' }));
   }
-};
+});
