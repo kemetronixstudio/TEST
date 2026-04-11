@@ -1,7 +1,7 @@
 
 /* ---- BEGIN backend-access.js ---- */
 
-if (typeof window.askTextInput !== 'function') window.askTextInput = function askTextInput(message, defaultValue){
+if (typeof window.askTextInput !== 'function') window.askTextInput = if (typeof window.askTextInput !== 'function') window.askTextInput = function askTextInput(message, defaultValue){
   if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.resolve(null);
   return new Promise(function(resolve){
     var overlay = document.createElement('div');

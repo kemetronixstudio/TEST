@@ -3290,7 +3290,7 @@ Object.assign(translations.ar, {
   function syncModeCardsUI(){
     var selected = document.querySelector('input[name="gameModeCards"]:checked');
     document.querySelectorAll('.mode-card').forEach(function(card){
-      card.classList.toggle('is-active', !!selected && card.getAttribute('data-mode-card') === selected.value);
+      card.classList.toggle('active', !!selected && (card.getAttribute('data-mode-value') || card.getAttribute('data-mode-card')) === selected.value);
     });
     var hiddenMode = document.getElementById('gameMode');
     if(hiddenMode && selected) hiddenMode.value = selected.value;
@@ -4176,7 +4176,14 @@ try {
     hookAdmin();
   }
   onReady(heartbeat);
-  setInterval(heartbeat, 1200);
+  var heartbeatTimer = setInterval(function(){
+    heartbeat();
+    try {
+      if (document.body && document.body.dataset && document.body.dataset.quizInitGuard) {
+        clearInterval(heartbeatTimer);
+      }
+    } catch (e) {}
+  }, 1200);
 })();
 
 /* ---- END final-runtime-fixes.js ---- */
@@ -4318,3 +4325,36 @@ try {
   };
 })();
 
+
+
+window.saveClassManagerFromAdmin = function(){
+  try {
+    var keyEl = document.getElementById('classKey');
+    var nameEl = document.getElementById('className');
+    if (!keyEl || !nameEl) return false;
+    var key = String(keyEl.value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
+    var name = String(nameEl.value || '').trim();
+    if (!key || !name) {
+      alert(getLang && getLang()==='ar' ? 'اكتب كود الصف والاسم.' : 'Enter class key and class name.');
+      return false;
+    }
+    var rows = (window.getCustomClasses ? window.getCustomClasses() : []).slice();
+    var idx = rows.findIndex(function(r){ return String(r.key||'').toLowerCase() === key; });
+    var row = { key:key, name:name, label:name, title:name };
+    if (idx >= 0) rows[idx] = row; else rows.push(row);
+    if (window.saveCustomClasses) window.saveCustomClasses(rows);
+    if (typeof window.renderQuizAccessEditor === 'function') try { window.renderQuizAccessEditor(); } catch(e) {}
+    if (typeof window.renderTeacherQuestionPicker === 'function') try { window.renderTeacherQuestionPicker(); } catch(e) {}
+    if (typeof window.applyTranslations === 'function') try { window.applyTranslations(); } catch(e) {}
+    keyEl.value = '';
+    nameEl.value = '';
+    return true;
+  } catch (e) { return false; }
+};
+
+document.addEventListener('click', function(e){
+  var btn = e.target && e.target.closest ? e.target.closest('#saveClassBtn') : null;
+  if (!btn) return;
+  e.preventDefault();
+  window.saveClassManagerFromAdmin();
+});
