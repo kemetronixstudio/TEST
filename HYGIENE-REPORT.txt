@@ -1,0 +1,11 @@
+app-core.js length before: 291157
+app-core.js length after:  291151
+
+Removed old version comments matching vX.Y style.
+
+Duplicate helper removals:
+- $: 0
+- escapeHtml: 0
+- esc: 0
+- readJson: 0
+- writeJson: 0

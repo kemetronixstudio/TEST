@@ -1,0 +1,3 @@
+Changed renderer blocks: 0
+Remaining unsafe safeUserAttr onclick patterns: 0
+Remaining unsafe safeUser onclick patterns: 0

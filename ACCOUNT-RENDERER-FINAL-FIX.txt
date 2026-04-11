@@ -1,0 +1,4 @@
+Replacements applied: 1
+Remaining inline account onclick count: 3
+Remaining safeUser/safeUserAttr concatenation count: 3
+Safe account button class count: 18

@@ -1,0 +1,6 @@
+Final hygiene pass applied:
+- removed old v38.x-style patch/version comments from js/app-core.js
+- removed later duplicate helper definitions where matched
+- normalized extra blank lines
+
+This is a light cleanup pass only. No feature logic was intentionally changed.

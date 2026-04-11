@@ -1,0 +1,23 @@
+Fixed from audit:
+- Reworked account action buttons in js/app-core.js to avoid unsafe inline username injection.
+- Escaped homework history values in parent.js before innerHTML rendering.
+- Removed deleted file refs from service-worker.js and rebuilt its asset list with existing files only.
+- Added placeholder assets for missing icons and grade-card images.
+- Deleted dead root JS files not loaded by any HTML page:
+- backend-access.js
+- custom-classes.js
+- grades-extension.js
+- homework-admin.js
+- play-question-bank.js
+- play-test.js
+- quiz-bulk-package.js
+- remove-snapshot.js
+- student-cloud-admin.js
+- ui-language-patch.js
+
+Quality:
+- Standardized html2canvas CDN in certificate.html to jsdelivr to match admin.html.
+
+Known but intentional:
+- console.error / console.warn remain for debugging.
+- CDN library version upgrades were not changed in this pass.

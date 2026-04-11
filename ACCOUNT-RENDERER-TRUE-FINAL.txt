@@ -1,0 +1,2 @@
+Renderer block replacements applied: 1
+Remaining inline account onclick occurrences: 0

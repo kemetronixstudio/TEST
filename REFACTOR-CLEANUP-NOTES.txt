@@ -1,0 +1,37 @@
+Refactor cleanup applied:
+
+1. Removed obsolete patch / legacy files from project root:
+- final-polish-pack.js
+- final-runtime-fixes.js
+- final-ui-fixes.js
+- cleanup-audit-pack.js
+- next-upgrade-pack.js
+- latest-admin-dynamic-fix.js
+- hobby-upgrades.js
+- runtime-ui-fixes.js
+- kg1-grade6-support.js
+- adaptive-access-admin.js
+- script.js
+
+2. Marked js/app-core.js as the active frontend bundle.
+
+3. Added clear section headers in js/app-core.js for:
+- TRANSLATIONS
+- QUESTION DATA
+- STORAGE HELPERS
+- QUIZ / HOMEWORK RUNTIME
+- ADMIN PANEL
+
+4. Deduplicated repeated simple helper functions in js/app-core.js by keeping the first copy
+   and removing later duplicates where matched:
+- $()
+- esc()/escapeHtml()
+- readJson()
+- writeJson()
+
+5. Removed stale HTML references to deleted patch files.
+
+Important:
+- This is a real cleanup pass, but app-core.js is still a large consolidated bundle.
+- The next deeper refactor would split app-core.js into smaller files such as:
+  utils.js, data.js, translations.js, quiz.js, admin.js, progress.js, theme.js

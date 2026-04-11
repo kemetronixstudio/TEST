@@ -1,0 +1,13 @@
+Fixed the remaining account renderers in js/app-core.js that still used:
+- safeUserAttr inline onclick
+- safeUser inline onclick
+
+Replaced them with:
+- js-acc-edit
+- js-acc-pass
+- js-acc-delete
+using encoded data-user attributes.
+
+Remaining safeUserAttr inline account-button patterns: 0
+Remaining safeUser inline account-button patterns: 0
+Total renderer substitutions in this pass: 0

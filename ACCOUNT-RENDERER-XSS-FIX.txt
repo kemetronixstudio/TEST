@@ -1,0 +1,9 @@
+Fixed the remaining older account renderers in js/app-core.js.
+
+Replaced unsafe inline onclick username injection with:
+- js-acc-edit
+- js-acc-pass
+- js-acc-delete
+using encoded data-user attributes.
+
+Remaining unsafe inline account-button patterns found after patch: 0

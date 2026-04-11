@@ -1,0 +1,6 @@
+
+Cleaned structure:
+- Merged patch files into js/app-core.js, js/admin-extra.js, and js/play-main.js
+- Updated HTML pages to load fewer scripts
+- Original source files kept in project for reference, but no longer loaded by HTML
+- This is a consolidation pass aimed at reducing patch-file load-order fragility

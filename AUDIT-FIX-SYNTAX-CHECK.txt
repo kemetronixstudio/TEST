@@ -1,0 +1,132 @@
+api/access-accounts/index.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/access-accounts/index.js:104
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/homework/index.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/homework/index.js:113
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/analytics.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/analytics.js:56
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/detail.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/detail.js:41
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/list.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/list.js:45
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/play.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/play.js:105
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/save-note.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/save-note.js:40
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/save-progress.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/save-progress.js:31
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/start.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/start.js:31
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+api/student/submit.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/api/student/submit.js:31
+};
+^
+
+SyntaxError: missing ) after argument list
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+homework.js: OK
+js/admin-extra.js: OK
+js/app-core.js: ERROR
+/mnt/data/drtarek_audit_issue_fix/js/app-core.js:3740
+)();
+^
+
+SyntaxError: Unexpected token ')'
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+js/play-main.js: OK
+lib/access-accounts-backend.js: OK
+lib/api-security.js: OK
+lib/homework-backend.js: OK
+lib/kv-store.js: OK
+lib/student-cloud-backend.js: OK
+parent.js: OK
+service-worker.js: OK
+student-cloud-client.js: OK
