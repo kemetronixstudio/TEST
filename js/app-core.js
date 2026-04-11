@@ -411,6 +411,20 @@ function initLangButtons(){ document.querySelectorAll('.lang-btn').forEach(btn=>
 // STORAGE HELPERS
 // =====================
 
+
+function getPersistentQuizAccessRaw(){
+  try {
+    return sessionStorage.getItem('kgEnglishQuizAccessV29') || localStorage.getItem('kgEnglishQuizAccessV29') || '{}';
+  } catch (e) {
+    try { return localStorage.getItem('kgEnglishQuizAccessV29') || '{}'; } catch (e2) {}
+  }
+  return '{}';
+}
+function setPersistentQuizAccessRaw(value){
+  try { setPersistentQuizAccessRaw( value); } catch (e) {}
+  try { localStorage.setItem('kgEnglishQuizAccessV29', value); } catch (e) {}
+}
+
 function readJson(key, fallback){ try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; } }
 function writeJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
 function getProgress(){ return readJson(storeKeys.progress, {}); }
@@ -3645,8 +3659,7 @@ document.addEventListener('DOMContentLoaded', function(){
 try {
   var legacyQuizAccess = localStorage.getItem('kgEnglishQuizAccessV29');
   if (legacyQuizAccess && !sessionStorage.getItem('kgEnglishQuizAccessV29')) {
-    sessionStorage.setItem('kgEnglishQuizAccessV29', legacyQuizAccess);
-    localStorage.removeItem('kgEnglishQuizAccessV29');
+    setPersistentQuizAccessRaw(legacyQuizAccess);
   }
 } catch (e) {}
 
