@@ -31,3 +31,7 @@ Auth hardening update:
 - Built-in bootstrap admin now lives in data/builtin-access-accounts.json as a PBKDF2 hash.
 - Backend login is required for the bootstrap admin account.
 - Default bootstrap login remains admin / Admin@123; change it immediately after first login.
+
+Vercel deployment note:
+- Removed the invalid `functions.api/**/*.js.runtime` override from `vercel.json`.
+- Pinned Node to `20.x` in `package.json` to avoid automatic major-version upgrades on Vercel.

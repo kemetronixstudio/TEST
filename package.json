@@ -1,10 +1,10 @@
 {
   "name": "dr-tarek-quiz-app",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Dr. Tarek quiz and homework app",
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   },
   "scripts": {
     "serve-static": "python3 -m http.server 8080",
