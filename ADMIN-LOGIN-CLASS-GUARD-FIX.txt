@@ -1,0 +1,4 @@
+Fixed in this ZIP:
+- Admin login now tries local client accounts first, then falls back to backend login via /api/access-accounts?action=login
+- This fixes fresh-install login when ADMINS = [] and no local access accounts exist, as long as backend admin accounts are configured
+- Class quiz identity heartbeat now uses a dataset guard and will not call initQuiz() repeatedly every 1200ms for the same grade
