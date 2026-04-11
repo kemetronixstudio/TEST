@@ -11,8 +11,11 @@
       "bulkQuestions",
       "questionBank",
       "classManager",
+      "homeworkAnalytics",
+      "homeworkBuilder",
+      "homeworkReports",
       "accountManager"
     ],
-    "pass": "Admin@123"
+    "passwordHash": "pbkdf2$120000$6cf911c6802ab8e0184486c82ffb5f64$03d9803123740d0c7887be1ae6704272e5e0dffbaac8a02e7c257dbb70ee455f"
   }
 ]
