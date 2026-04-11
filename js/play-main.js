@@ -1,9 +1,17 @@
 
 function getSelectedGameMode(){
+  const checked = document.querySelector('input[name="gameModeCards"]:checked');
+  if (checked && checked.value) {
+    const mode = String(checked.value).trim().toLowerCase();
+    const hidden = document.getElementById('gameMode');
+    if (hidden) hidden.value = mode;
+    return mode;
+  }
+  const active = document.querySelector('#gameModeCardsWrap .mode-card.active, #gameModeCardsWrap .mode-card.is-active');
+  if (active && active.getAttribute('data-mode-value')) return String(active.getAttribute('data-mode-value')).trim().toLowerCase();
   const el = document.getElementById('gameMode');
   if (el && el.value) return String(el.value).trim().toLowerCase();
-  const active = document.querySelector('#gameModeCardsWrap .mode-card.active, #gameModeCardsWrap .mode-card.is-active');
-  return String(active?.getAttribute('data-mode-value') || 'question_timer').trim().toLowerCase();
+  return 'question_timer';
 }
 
 

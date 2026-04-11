@@ -41,8 +41,10 @@
 
       if ($('parentStatus')) $('parentStatus').textContent = 'Dashboard ready.';
     } catch (error) {
-      if ($('parentStatus')) $('parentStatus').textContent = error.message || 'Could not load dashboard.';
-      if ($('parentHistoryBody')) $('parentHistoryBody').innerHTML = '<tr><td colspan="5">No records found.</td></tr>';
+      const msg = (error && error.message) ? String(error.message) : 'Could not load dashboard.';
+      const looksLikeMissingBackend = /404|Failed to fetch|Could not load dashboard/i.test(msg);
+      if ($('parentStatus')) $('parentStatus').textContent = looksLikeMissingBackend ? 'Parent dashboard needs the homework API backend. Open the app through your server or deploy the API first.' : msg;
+      if ($('parentHistoryBody')) $('parentHistoryBody').innerHTML = `<tr><td colspan="5">${parentEsc(looksLikeMissingBackend ? 'Backend not available yet.' : 'No records found.')}</td></tr>`;
     }
   }
 

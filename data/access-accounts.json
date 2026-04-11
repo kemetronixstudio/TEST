@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "user": "admin",
+    "role": "admin",
+    "permissions": [
+      "dashboard",
+      "levelVisibility",
+      "timerSettings",
+      "quizAccess",
+      "teacherTest",
+      "bulkQuestions",
+      "questionBank",
+      "classManager",
+      "accountManager"
+    ],
+    "pass": "Admin@123"
+  }
+]
