@@ -17,11 +17,11 @@
 - `class.html` now defaults to `kg1` if no `?grade=` parameter is provided.
 - Committed session secret file was removed from the bundle.
 
-## Bootstrap admin
-- Username: `admin`
-- Password: `Admin@123`
-
-Change this password immediately after first login.
+## Bootstrap admins
+- Username: `KEMETRONIX`
+- Password: `************`
+- Username: `Dr. Tarek`
+- Password: `************`
 
 ## Local static preview
 ```bash

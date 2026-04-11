@@ -1,6 +1,6 @@
 [
   {
-    "user": "admin",
+    "user": "KEMETRONIX",
     "role": "admin",
     "permissions": [
       "dashboard",
@@ -16,6 +16,25 @@
       "homeworkReports",
       "accountManager"
     ],
-    "passwordHash": "pbkdf2$120000$6cf911c6802ab8e0184486c82ffb5f64$03d9803123740d0c7887be1ae6704272e5e0dffbaac8a02e7c257dbb70ee455f"
+    "passwordHash": "pbkdf2$120000$671674e88a901eef94803e223c930572$228e04851c36f85ad1b29aedf49ad257722f238336100656f9c71943656f0bb0"
+  },
+  {
+    "user": "Dr. Tarek",
+    "role": "admin",
+    "permissions": [
+      "dashboard",
+      "levelVisibility",
+      "timerSettings",
+      "quizAccess",
+      "teacherTest",
+      "bulkQuestions",
+      "questionBank",
+      "classManager",
+      "homeworkAnalytics",
+      "homeworkBuilder",
+      "homeworkReports",
+      "accountManager"
+    ],
+    "passwordHash": "pbkdf2$120000$b5fcc3ade1b337fb6835c6c8d86e4eba$f51ba3c163d67d3eed21a345f55caae0310f03b8aef10d02e369ab41dd88d24a"
   }
 ]
