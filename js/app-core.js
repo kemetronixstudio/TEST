@@ -388,7 +388,7 @@ const storeKeys = {
   timerSettings:'kgEnglishTimerSettingsV23',
   quizAccess:'kgEnglishQuizAccessV29',
   teacherTests:'kgEnglishTeacherTestsV23',
-  archivedTeacherTestsV382:'kgEnglishArchivedTeacherTestsV382',
+  archivedTeacherTestsV23:'kgEnglishArchivedTeacherTestsV23',
   studentRotation:'kgEnglishStudentRotationV23',
   accessAccounts:'kgEnglishAccessAccountsV26'
 };
@@ -1499,9 +1499,9 @@ function isDuplicateQuestionEnhanced(text, list){
         const cfg=tests[grade];
         if(!cfg){ alert(getLang()==='ar'?'لا يوجد اختبار حالي لنسخه.':'No current test to clone.'); return; }
         const cloneName=(from.value||'').trim() || `${cfg.name || grade.toUpperCase()} Copy`;
-        const archived = readJson(storeKeys.archivedTeacherTestsV382, []);
+        const archived = readJson(storeKeys.archivedTeacherTestsV23, []);
         archived.push({ ...cfg, grade, archived:false, cloned:true, name:cloneName, createdAt:new Date().toISOString() });
-        writeJson(storeKeys.archivedTeacherTestsV382, archived);
+        writeJson(storeKeys.archivedTeacherTestsV23, archived);
         alert(getLang()==='ar'?'تم نسخ الاختبار وحفظه.':'Quiz cloned and saved.');
       };
     }
@@ -1511,9 +1511,9 @@ function isDuplicateQuestionEnhanced(text, list){
         const grade=((document.getElementById('testGrade')?.value||'KG1').trim().toLowerCase()==='kg2')?'kg2':(document.getElementById('testGrade')?.value||'kg1').trim().toLowerCase();
         const cfg=getTeacherTests()[grade];
         if(!cfg){ alert(getLang()==='ar'?'لا يوجد اختبار لأرشفته.':'No current test to archive.'); return; }
-        const archived = readJson(storeKeys.archivedTeacherTestsV382, []);
+        const archived = readJson(storeKeys.archivedTeacherTestsV23, []);
         archived.push({ ...cfg, grade, archived:true, createdAt:new Date().toISOString() });
-        writeJson(storeKeys.archivedTeacherTestsV382, archived);
+        writeJson(storeKeys.archivedTeacherTestsV23, archived);
         const tests = getTeacherTests(); tests[grade]=null; setTeacherTests(tests); renderTeacherTestEditor();
         alert(getLang()==='ar'?'تمت أرشفة الاختبار.':'Test archived.');
       };
@@ -2949,7 +2949,7 @@ Object.assign(translations.ar, {
 
 /* v12 play modes upgrade */
 (function(){
-  if (typeof document !== 'undefined' && document.body && document.body.dataset.page === 'playtest') return;
+  if (typeof document !== 'undefined' && document.body && document.body.dataset.page !== 'playtest') return;
   const APP = window;
   const MODE_KEYS = {
     question_timer: 'playLeaderboard_question_timer_v1',
@@ -4170,7 +4170,11 @@ try {
     }
     setTimeout(function(){ try { window.renderStoredQuestions && window.renderStoredQuestions(); } catch (e) {} }, 50);
   }
-  function heartbeat(){ hideQuickSchoolSnapshot(); ensureQuizIdentityFieldsNow(); hookAdmin(); }
+  function heartbeat(){
+    hideQuickSchoolSnapshot();
+    if (!(document.body && document.body.dataset && document.body.dataset.quizInitGuard)) ensureQuizIdentityFieldsNow();
+    hookAdmin();
+  }
   onReady(heartbeat);
   setInterval(heartbeat, 1200);
 })();
@@ -4279,5 +4283,38 @@ document.addEventListener('click', function(e){
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wireQuizContinueFallback, { once:true });
   else wireQuizContinueFallback();
   window.addEventListener('load', wireQuizContinueFallback);
+})();
+
+
+
+try {
+  var _legacyArchived = localStorage.getItem('kgEnglishArchivedTeacherTestsV382');
+  if (_legacyArchived && !localStorage.getItem('kgEnglishArchivedTeacherTestsV23')) {
+    localStorage.setItem('kgEnglishArchivedTeacherTestsV23', _legacyArchived);
+  }
+} catch (e) {}
+
+
+
+(function(){
+  const KEY_CLASSES = 'kgEnglishCustomClassesV29';
+  function readClassesSafe(){
+    try {
+      const rows = JSON.parse(localStorage.getItem(KEY_CLASSES) || '[]');
+      return Array.isArray(rows) ? rows : [];
+    } catch (e) { return []; }
+  }
+  function normalizeClassRow(row){
+    const key = String((row && (row.key || row.grade || row.id)) || '').trim().toLowerCase();
+    const name = String((row && (row.name || row.label || row.title || row.grade)) || key || '').trim();
+    if (!key || !name) return null;
+    return { key, name, label:name, title:name };
+  }
+  window.getCustomClasses = function(){
+    return readClassesSafe().map(normalizeClassRow).filter(Boolean);
+  };
+  window.getClasses = function(){
+    return window.getCustomClasses();
+  };
 })();
 
