@@ -15,6 +15,22 @@
             <button class="main-btn" id="loadHomeworkBtn" type="button">Verify & Show Homework</button>
             <div id="homeworkVerifiedBox" class="muted-note"></div>
             <div id="homeworkStatus" class="muted-note"></div>
+            <div id="homeworkLocalModeNote" class="muted-note hidden">Teacher-managed accounts can be created in Admin → Students Manager. For local static preview, you can also create a local demo student below.</div>
+            <div id="homeworkRegisterCard" class="stored-question hidden">
+              <h4>Create Local Demo Student</h4>
+              <p class="muted-note">This saves only in this browser for offline or localhost testing.</p>
+              <div class="editor-grid">
+                <input id="homeworkRegisterName" placeholder="Student name">
+                <select id="homeworkRegisterGrade"><option value="KG1">KG1</option><option value="KG2">KG2</option><option value="GRADE1">Grade 1</option><option value="GRADE2">Grade 2</option><option value="GRADE3">Grade 3</option><option value="GRADE4">Grade 4</option><option value="GRADE5">Grade 5</option><option value="GRADE6">Grade 6</option></select>
+                <input id="homeworkRegisterClass" placeholder="Class name">
+                <input id="homeworkRegisterPin" placeholder="PIN (optional)">
+              </div>
+              <div class="action-row wrap-row">
+                <button class="ghost-btn" id="toggleHomeworkRegisterBtn" type="button">Show Local Registration</button>
+                <button class="main-btn hidden" id="createHomeworkStudentBtn" type="button">Create Local Student</button>
+              </div>
+              <div id="homeworkRegisterStatus" class="muted-note"></div>
+            </div>
           </div>
         </div>
         <div class="homework-list-column">

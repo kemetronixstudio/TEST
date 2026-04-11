@@ -6,7 +6,7 @@ function withCors(handler){
   };
 }
 
-const { applyCors } = require('../../lib/api-security');
+const { applyCors, checkRateLimit, readJsonBody } = require('../../lib/api-security');
 const backend = require('../../lib/student-cloud-backend');
 
 module.exports = withCors(async function handler(req, res) {
@@ -17,7 +17,17 @@ module.exports = withCors(async function handler(req, res) {
     return;
   }
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const body = readJsonBody(req);
+    const ident = body.identity || body || {};
+    const identityKey = String((ident.studentId || ident.identityKey || ident.name || 'guest')).trim().toLowerCase();
+    const actionKey = 'student-save-progress:' + identityKey + ':' + String(body.quizKey || body.quizId || body.quiz || '');
+    const limited = checkRateLimit(req, actionKey);
+    if (!limited.ok) {
+      res.statusCode = 429;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: false, error: 'Too many requests. Try again in ' + limited.retryAfter + ' seconds.' }));
+      return;
+    }
     const result = await backend.saveProgress(body);
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');

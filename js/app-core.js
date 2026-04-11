@@ -4836,3 +4836,21 @@ document.addEventListener('click', function(e){
   else ready();
 })();
 /* ---- END final-local-security-patch.js ---- */
+
+(function(){
+  if (typeof window === 'undefined') return;
+  function migrateStorageKey(oldKey, newKey){
+    try {
+      var oldValue = localStorage.getItem(oldKey);
+      var newValue = localStorage.getItem(newKey);
+      if (oldValue && !newValue) localStorage.setItem(newKey, oldValue);
+    } catch (error) {}
+    try {
+      var oldSession = sessionStorage.getItem(oldKey);
+      var newSession = sessionStorage.getItem(newKey);
+      if (oldSession && !newSession) sessionStorage.setItem(newKey, oldSession);
+    } catch (error) {}
+  }
+  migrateStorageKey('kgEnglishTimerSettingsV21', 'kgEnglishTimerSettingsV23');
+  migrateStorageKey('kgEnglishArchivedTeacherTestsV382', 'kgEnglishArchivedTeacherTestsV23');
+})();

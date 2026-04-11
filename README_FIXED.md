@@ -19,9 +19,9 @@
 
 ## Bootstrap admins
 - Username: `KEMETRONIX`
-- Password: `************`
+- Password: `H01002439054`
 - Username: `Dr. Tarek`
-- Password: `************`
+- Password: `T01032188008`
 
 ## Local static preview
 ```bash
@@ -43,3 +43,10 @@ Then open:
 - Vercel config is valid for Node serverless functions.
 - Node is pinned to `20.x` in `package.json`.
 - For production, set `ACCESS_ACCOUNTS_SESSION_SECRET` and `ALLOWED_ORIGINS`.
+
+
+Additional notes in this build:
+- Local static homework preview now includes optional local demo student registration in the browser.
+- Teacher Test Builder now includes the advanced summary container expected by admin-extra.js.
+- Legacy timer/archive keys are migrated forward automatically when old localStorage keys are found.
+- Student and homework API endpoints now reject malformed JSON with a clear 400 response and apply request throttling.

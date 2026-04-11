@@ -6,6 +6,7 @@
   let state = null;
   let timer = null;
   let availableRows = [];
+  const isLocalPreview = /^file:$/i.test(String(location.protocol || '')) || /^(localhost|127\.0\.0\.1)$/i.test(String(location.hostname || ''));
   const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
   const LOCAL_KEY = 'kgHomeworkStaticStoreV1';
@@ -40,6 +41,18 @@
     const safe = ensureStoreShape(store);
     try { localStorage.setItem(LOCAL_KEY, JSON.stringify(safe)); } catch (error) {}
     return safe;
+  }
+  function nextStudentId(store){
+    const nums = (store.students || []).map((row) => Number(String(row.studentId || '').replace(/\D+/g, ''))).filter((n) => Number.isFinite(n));
+    return String((nums.length ? Math.max.apply(null, nums) : 0) + 1);
+  }
+  function nextStudentPin(store){
+    const pins = new Set((store.students || []).map((row) => String(row.pin || '').trim()));
+    for (let i = 1234; i <= 9999; i += 1) {
+      const pin = String(i);
+      if (!pins.has(pin)) return pin;
+    }
+    return String(Math.floor(1000 + Math.random() * 9000));
   }
   function findStudent(store, studentId, pin){
     return (store.students || []).find((row) => String(row.studentId || '').trim() === String(studentId || '').trim() && String(row.pin || '').trim() === String(pin || '').trim());
@@ -178,6 +191,26 @@
     throw new Error('Could not complete request.');
   }
 
+  function updateLocalModeUi(force){
+    const note = $('homeworkLocalModeNote');
+    const card = $('homeworkRegisterCard');
+    const toggle = $('toggleHomeworkRegisterBtn');
+    if (!note || !card) return;
+    const show = !!force || isLocalPreview;
+    note.classList.toggle('hidden', !show);
+    card.classList.toggle('hidden', !show);
+    if (toggle && !toggle.dataset.boundLocalRegister) {
+      toggle.dataset.boundLocalRegister = '1';
+      toggle.addEventListener('click', function(){
+        const createBtn = $('createHomeworkStudentBtn');
+        const expanded = card.dataset.expanded === '1';
+        card.dataset.expanded = expanded ? '0' : '1';
+        if (createBtn) createBtn.classList.toggle('hidden', expanded);
+        toggle.textContent = expanded ? 'Show Local Registration' : 'Hide Local Registration';
+      });
+    }
+  }
+
   async function api(action, options){
     const suffix = action ? `?action=${encodeURIComponent(action)}` : '';
     try {
@@ -186,12 +219,40 @@
       if (!res.ok || !data.ok) throw new Error(data.error || 'Could not complete request.');
       return data;
     } catch (error) {
+      updateLocalModeUi(true);
       return localApi(action, options || {});
     }
   }
 
   function setStatus(msg){
     $('homeworkStatus').textContent = msg || '';
+  }
+
+  async function createLocalStudent(){
+    const name = String($('homeworkRegisterName')?.value || '').trim();
+    const grade = String($('homeworkRegisterGrade')?.value || 'KG1').trim().toUpperCase();
+    const className = String($('homeworkRegisterClass')?.value || '').trim() || 'Class';
+    const customPin = String($('homeworkRegisterPin')?.value || '').trim();
+    const status = $('homeworkRegisterStatus');
+    if (!name) { if (status) status.textContent = 'Please enter the student name.'; return; }
+    const store = await readLocalStore();
+    const studentId = nextStudentId(store);
+    const pin = customPin || nextStudentPin(store);
+    store.students = Array.isArray(store.students) ? store.students : [];
+    store.students.push({
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      studentId,
+      pin,
+      name,
+      grade,
+      className,
+      active: true
+    });
+    writeLocalStore(store);
+    if ($('homeworkStudentId')) $('homeworkStudentId').value = studentId;
+    if ($('homeworkStudentPin')) $('homeworkStudentPin').value = pin;
+    if (status) status.textContent = `Created local student ${name}. ID: ${studentId} | PIN: ${pin}`;
+    setStatus('Local student created. You can verify and open homework now.');
   }
 
   function studentIdentity(){
@@ -447,6 +508,7 @@
   }
 
   $('loadHomeworkBtn')?.addEventListener('click', renderAssignments);
+  $('createHomeworkStudentBtn')?.addEventListener('click', createLocalStudent);
   $('homeworkNextBtn')?.addEventListener('click', nextQuestion);
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.homework-open-btn');
