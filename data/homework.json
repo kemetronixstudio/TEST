@@ -96,5 +96,17 @@
         }
       ]
     }
-  }
+  },
+  "students": [
+    {
+      "id": "STD-1",
+      "name": "Ali",
+      "grade": "KG1",
+      "className": "A",
+      "studentId": "1",
+      "pin": "1234",
+      "active": true,
+      "createdAt": "2026-04-11T00:00:00.000Z"
+    }
+  ]
 }

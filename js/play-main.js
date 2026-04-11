@@ -184,7 +184,70 @@ function resolvePlayQuestionImage(image){
   function loadSoundSetting(){ try{ return localStorage.getItem(SOUND_STORAGE_KEY) !== '0'; }catch(e){ return true; } }
   function saveAutoNextSetting(){ try{ localStorage.setItem(AUTO_NEXT_STORAGE_KEY, autoNextEnabled ? '1' : '0'); }catch(e){} }
   function loadAutoNextSetting(){ try{ return localStorage.getItem(AUTO_NEXT_STORAGE_KEY) !== '0'; }catch(e){ return true; } }
-  async function request(path, options){ const res = await fetch(API + path, Object.assign({ credentials:'same-origin', cache:'no-store' }, options || {})); const data = await res.json().catch(()=>({ ok:false, error:'Request failed' })); if (!res.ok || !data.ok) throw new Error(data.error || 'Request failed'); return data; }
+  const PLAY_LOCAL_KEY = 'kgPlayLeaderboardLocalV1';
+  function readPlayLocal(){ try { return JSON.parse(localStorage.getItem(PLAY_LOCAL_KEY) || '{"sessions":{},"scores":{}}'); } catch (error) { return { sessions:{}, scores:{} }; } }
+  function writePlayLocal(store){ try { localStorage.setItem(PLAY_LOCAL_KEY, JSON.stringify(store || { sessions:{}, scores:{} })); } catch (error) {} return store; }
+  function playerKey(identity){ return [String(identity && identity.name || '').trim().toLowerCase(), String(identity && identity.studentId || '').trim().toLowerCase(), String(identity && identity.grade || '').trim().toLowerCase()].join('||'); }
+  function buildLeaderboardPayload(store){
+    const rows = Object.values((store && store.scores) || {}).sort((a,b) => Number(b.bestScore || 0) - Number(a.bestScore || 0) || String(b.lastPlayed || '').localeCompare(String(a.lastPlayed || '')));
+    return { ok:true, leaderboard: rows, top3: rows.slice(0,3) };
+  }
+  async function localPlayRequest(path, options){
+    const action = String(path || '').split('action=').pop().trim().toLowerCase();
+    const payload = options && options.body ? JSON.parse(options.body || '{}') : {};
+    const store = readPlayLocal();
+    if (action === 'leaderboard' || !action) return buildLeaderboardPayload(store);
+    if (action === 'start') {
+      const identity = payload.identity || {};
+      const sessionId = String(payload.sessionId || '').trim();
+      if (sessionId && store.sessions[sessionId] && store.sessions[sessionId].progress && !store.sessions[sessionId].progress.completed) {
+        return { ok:true, identity, sessionId, progress: store.sessions[sessionId].progress };
+      }
+      const nextId = `PLAY-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      store.sessions[nextId] = { identity, progress:null, updatedAt:new Date().toISOString() };
+      writePlayLocal(store);
+      return { ok:true, identity, sessionId: nextId, progress:null };
+    }
+    if (action === 'save-progress') {
+      const sessionId = String(payload.sessionId || payload.quizKey || '').trim();
+      if (!sessionId) throw new Error('Missing session id');
+      store.sessions[sessionId] = { identity: payload.identity || {}, progress: payload.state || payload.progress || {}, updatedAt:new Date().toISOString() };
+      writePlayLocal(store);
+      return { ok:true };
+    }
+    if (action === 'submit') {
+      const sessionId = String(payload.sessionId || payload.quizKey || '').trim();
+      const identity = payload.identity || {};
+      const result = payload.result || {};
+      if (sessionId) store.sessions[sessionId] = { identity, progress: Object.assign({}, payload.progress || {}, { completed:true }), updatedAt:new Date().toISOString() };
+      const key = playerKey(identity);
+      const existing = store.scores[key] || { name: identity.name || '', studentId: identity.studentId || '', grade: identity.grade || '', bestScore: 0, attempts: 0, lastPlayed:'', lastScore:0, stage: result.stageLabel || result.stage || '' };
+      const score = Number(result.score || 0) || 0;
+      existing.name = identity.name || existing.name;
+      existing.studentId = identity.studentId || existing.studentId;
+      existing.grade = identity.grade || existing.grade;
+      existing.bestScore = Math.max(Number(existing.bestScore || 0) || 0, score);
+      existing.lastScore = score;
+      existing.attempts = (Number(existing.attempts || 0) || 0) + 1;
+      existing.lastPlayed = result.completedAt || new Date().toISOString();
+      existing.stage = result.stageLabel || result.stage || existing.stage || '';
+      store.scores[key] = existing;
+      writePlayLocal(store);
+      const board = buildLeaderboardPayload(store);
+      return Object.assign({ ok:true }, board);
+    }
+    throw new Error('Request failed');
+  }
+  async function request(path, options){
+    try {
+      const res = await fetch(API + path, Object.assign({ credentials:'same-origin', cache:'no-store' }, options || {}));
+      const data = await res.json().catch(()=>({ ok:false, error:'Request failed' }));
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    } catch (error) {
+      return localPlayRequest(path, options || {});
+    }
+  }
   function getStageFromGrade(grade){ const g = String(grade || '').toLowerCase().replace(/\s+/g,''); if (g === 'kg1' || g === 'kg2' || g === 'grade1' || g === 'grade2') return 'starter'; if (g === 'grade3' || g === 'grade4') return 'explorer'; if (g === 'grade5' || g === 'grade6') return 'champion'; return 'starter'; }
   function getStageLabel(stage){ return (STAGE_LABELS[stage] && STAGE_LABELS[stage][getLang()]) || STAGE_LABELS[stage].en; }
   function buildIdentity(){ const name = String($('playStudentName')?.value || '').trim(); const studentId = String($('playStudentId')?.value || '').trim(); const grade = String($('playStudentGrade')?.value || 'KG1').trim(); if (!name) throw new Error(tr('playEnterName')); return { name, studentId, grade, isGuest:true, className:'Play & Test' }; }

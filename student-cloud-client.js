@@ -19,17 +19,55 @@
     const nameEl = $('guestInviteName');
     if (nameEl) nameEl.textContent = data.studentName || data.name || 'Dear student';
   }
+  const LOCAL_CLOUD_KEY = 'kgStudentCloudLocalV1';
+  function readLocalCloud(){
+    try { return JSON.parse(localStorage.getItem(LOCAL_CLOUD_KEY) || '{"sessions":{},"results":{}}'); }
+    catch (error) { return { sessions:{}, results:{} }; }
+  }
+  function writeLocalCloud(store){
+    const safe = store && typeof store === 'object' ? store : { sessions:{}, results:{} };
+    try { localStorage.setItem(LOCAL_CLOUD_KEY, JSON.stringify(safe)); } catch (error) {}
+    return safe;
+  }
+  function localIdentity(payload){ return Object.assign({ name:'', studentId:'', grade:'', className:'', isGuest:false }, payload || {}); }
+  function resultKey(identity, quizKey){ return [String(identity.grade || '').trim().toUpperCase(), String(identity.className || '').trim().toLowerCase(), String(identity.studentId || '').trim().toLowerCase(), String(identity.name || '').trim().toLowerCase(), String(quizKey || '').trim()].join('||'); }
   async function post(path, payload){
-    const res = await fetch(API_BASE + path, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      credentials: 'same-origin',
-      cache: 'no-store',
-      body: JSON.stringify(payload || {})
-    });
-    const data = await res.json().catch(()=>({ ok:false, error:'Request failed' }));
-    if (!res.ok || !data.ok) throw new Error(data.error || ('Request failed: ' + res.status));
-    return data;
+    try {
+      const res = await fetch(API_BASE + path, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify(payload || {})
+      });
+      const data = await res.json().catch(()=>({ ok:false, error:'Request failed' }));
+      if (!res.ok || !data.ok) throw new Error(data.error || ('Request failed: ' + res.status));
+      return data;
+    } catch (error) {
+      const store = readLocalCloud();
+      const identity = localIdentity((payload && payload.identity) || payload || {});
+      const quizKey = String((payload && (payload.quizKey || payload.quizId || payload.quiz)) || '').trim();
+      if (path === '/start') {
+        const key = resultKey(identity, quizKey);
+        const session = store.sessions[key] || null;
+        return { ok:true, identity, quizKey, progress: session && session.state ? session.state : null, result: store.results[key] || null };
+      }
+      if (path === '/save-progress') {
+        const key = resultKey(identity, quizKey);
+        store.sessions[key] = { identity, state: (payload && (payload.state || payload.progress)) || {}, updatedAt: new Date().toISOString() };
+        writeLocalCloud(store);
+        return { ok:true };
+      }
+      if (path === '/submit') {
+        const key = resultKey(identity, quizKey);
+        const result = (payload && payload.result) || payload || {};
+        store.results[key] = result;
+        store.sessions[key] = { identity, state: Object.assign({}, (payload && (payload.state || payload.progress)) || {}, { completed:true }), updatedAt: new Date().toISOString() };
+        writeLocalCloud(store);
+        return { ok:true, result };
+      }
+      throw error;
+    }
   }
   function buildQuizKey(info){
     const grade = String(info.grade || '').trim().toUpperCase();

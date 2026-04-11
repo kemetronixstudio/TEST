@@ -12,6 +12,23 @@
   if (typeof document === 'undefined' || !document.body || document.body.dataset.page !== 'parent') return;
   const $ = (id) => document.getElementById(id);
 
+  const LOCAL_KEY = 'kgHomeworkStaticStoreV1';
+  function localSummary(studentId, pin){
+    try {
+      const store = JSON.parse(localStorage.getItem(LOCAL_KEY) || '{}');
+      const students = Array.isArray(store.students) ? store.students : [];
+      const student = students.find((row) => String(row.studentId || '').trim() === studentId && String(row.pin || '').trim() === pin);
+      if (!student) throw new Error('Student ID or PIN is not correct');
+      const rows = (Array.isArray(store.submissions) ? store.submissions : []).filter((row) => String(row.studentId || '').trim() === studentId).sort((a,b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
+      const percents = rows.map((row) => Number(row.percent || 0) || 0);
+      const averagePercent = percents.length ? Math.round(percents.reduce((sum, value) => sum + value, 0) / percents.length) : 0;
+      const bestPercent = percents.length ? Math.max.apply(null, percents) : 0;
+      return { ok:true, student, rows, summary:{ averagePercent, bestPercent, totalSubmissions: rows.length } };
+    } catch (error) {
+      return { ok:false, error: error.message || 'Could not load dashboard.' };
+    }
+  }
+
   async function loadDashboard(){
     const studentId = String($('parentStudentId')?.value || '').trim();
     const pin = String($('parentStudentPin')?.value || '').trim();
@@ -21,13 +38,19 @@
     }
     if ($('parentStatus')) $('parentStatus').textContent = 'Loading...';
     try {
-      const res = await fetch('/api/homework?action=parent-summary', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ studentId, pin })
-      });
-      const data = await res.json().catch(() => ({ ok:false, error:'Could not load dashboard.' }));
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load dashboard.');
+      let data;
+      try {
+        const res = await fetch('/api/homework?action=parent-summary', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ studentId, pin })
+        });
+        data = await res.json().catch(() => ({ ok:false, error:'Could not load dashboard.' }));
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load dashboard.');
+      } catch (error) {
+        data = localSummary(studentId, pin);
+        if (!data.ok) throw new Error(data.error || 'Could not load dashboard.');
+      }
 
       if ($('parentStudentName')) $('parentStudentName').textContent = `${data.student.name} (${data.student.studentId})`;
       if ($('parentAverage')) $('parentAverage').textContent = `${Number(data.summary.averagePercent || 0)}%`;
@@ -42,9 +65,8 @@
       if ($('parentStatus')) $('parentStatus').textContent = 'Dashboard ready.';
     } catch (error) {
       const msg = (error && error.message) ? String(error.message) : 'Could not load dashboard.';
-      const looksLikeMissingBackend = /404|Failed to fetch|Could not load dashboard/i.test(msg);
-      if ($('parentStatus')) $('parentStatus').textContent = looksLikeMissingBackend ? 'Parent dashboard needs the homework API backend. Open the app through your server or deploy the API first.' : msg;
-      if ($('parentHistoryBody')) $('parentHistoryBody').innerHTML = `<tr><td colspan="5">${parentEsc(looksLikeMissingBackend ? 'Backend not available yet.' : 'No records found.')}</td></tr>`;
+      if ($('parentStatus')) $('parentStatus').textContent = msg;
+      if ($('parentHistoryBody')) $('parentHistoryBody').innerHTML = `<tr><td colspan="5">${parentEsc('No records found.')}</td></tr>`;
     }
   }
 

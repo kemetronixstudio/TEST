@@ -66,7 +66,10 @@
   try {
     var params = new URLSearchParams(location.search);
     var grade = String(params.get('grade') || '').trim().toLowerCase();
-    if (grade) document.body.dataset.grade = grade;
-  } catch (e) {}
+    if (!grade) grade = 'kg1';
+    document.body.dataset.grade = grade;
+  } catch (e) {
+    document.body.dataset.grade = 'kg1';
+  }
 })();
 </script><script src="student-cloud-client.js"></script><script src="js/app-core.js"></script></body></html>

@@ -8,12 +8,186 @@
   let availableRows = [];
   const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
+  const LOCAL_KEY = 'kgHomeworkStaticStoreV1';
+
+  function normalizeText(value){ return String(value || '').trim().toLowerCase(); }
+  function slugify(value){ return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+  function ensureStoreShape(raw){
+    const data = raw && typeof raw === 'object' ? raw : {};
+    return {
+      assignments: Array.isArray(data.assignments) ? data.assignments : [],
+      submissions: Array.isArray(data.submissions) ? data.submissions : [],
+      attempts: data.attempts && typeof data.attempts === 'object' ? data.attempts : {},
+      students: Array.isArray(data.students) ? data.students : []
+    };
+  }
+  async function readLocalStore(){
+    try {
+      const saved = localStorage.getItem(LOCAL_KEY);
+      if (saved) return ensureStoreShape(JSON.parse(saved));
+    } catch (error) {}
+    try {
+      const res = await fetch('data/homework.json', { cache:'no-store' });
+      const data = await res.json();
+      const safe = ensureStoreShape(data);
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(safe)); } catch (error) {}
+      return safe;
+    } catch (error) {
+      return ensureStoreShape(null);
+    }
+  }
+  function writeLocalStore(store){
+    const safe = ensureStoreShape(store);
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(safe)); } catch (error) {}
+    return safe;
+  }
+  function findStudent(store, studentId, pin){
+    return (store.students || []).find((row) => String(row.studentId || '').trim() === String(studentId || '').trim() && String(row.pin || '').trim() === String(pin || '').trim());
+  }
+  function identityFromStudent(student){
+    return {
+      name: student.name,
+      studentId: student.studentId,
+      grade: String(student.grade || '').trim().toUpperCase(),
+      className: String(student.className || student.class || '').trim(),
+      pin: String(student.pin || '').trim(),
+      identityKey: [String(student.grade || '').trim().toUpperCase(), slugify(student.className || student.class || ''), slugify(student.studentId || 'no-id'), slugify(student.name || '')].join('::')
+    };
+  }
+  function attemptKey(identity, homeworkId){ return `${identity.identityKey}::${String(homeworkId || '').trim()}`; }
+  function publicAssignment(hw, extra){
+    const out = Object.assign({}, hw || {}, extra || {});
+    delete out.password;
+    return out;
+  }
+  function canAccess(hw, identity){
+    if (normalizeText(hw.grade) !== normalizeText(identity.grade)) return false;
+    if (!Array.isArray(hw.classes) || !hw.classes.length) return true;
+    return hw.classes.some((name) => normalizeText(name) === normalizeText(identity.className));
+  }
+  function answerMatches(a, b){ return normalizeText(a) === normalizeText(b); }
+  async function localApi(action, options){
+    const payload = options && options.body ? JSON.parse(options.body || '{}') : {};
+    const store = await readLocalStore();
+
+    if (action === 'identify-student') {
+      const student = findStudent(store, payload.studentId, payload.pin);
+      if (!student) throw new Error('Student ID or PIN is not correct');
+      return { ok:true, student };
+    }
+
+    if (action === 'available') {
+      const student = findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
+      if (!student) throw new Error('Student ID or PIN is not correct');
+      const identity = identityFromStudent(student);
+      const rows = (store.assignments || []).filter((hw) => canAccess(hw, identity)).map((hw) => {
+        const rec = store.attempts[attemptKey(identity, hw.id)] || { count:0, sessions:[] };
+        const triesUsed = Number(rec.count || 0) || 0;
+        const tryLimit = Number(hw.tryLimit || 0) || 0;
+        return publicAssignment(hw, { triesUsed, blocked: tryLimit > 0 ? triesUsed >= tryLimit : false, remainingTries: tryLimit > 0 ? Math.max(0, tryLimit - triesUsed) : null });
+      });
+      return { ok:true, rows };
+    }
+
+    if (action === 'start') {
+      const student = findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
+      if (!student) throw new Error('Student ID or PIN is not correct');
+      const identity = identityFromStudent(student);
+      const hw = (store.assignments || []).find((item) => String(item.id || '') === String(payload.homeworkId || '').trim());
+      if (!hw) throw new Error('Homework was not found');
+      if (!canAccess(hw, identity)) throw new Error('This homework is not available for this student');
+      if (hw.usePassword && String(payload.password || '').trim() !== String(hw.password || '').trim()) throw new Error('Wrong password');
+      const key = attemptKey(identity, hw.id);
+      const rec = store.attempts[key] && typeof store.attempts[key] === 'object' ? store.attempts[key] : { count:0, sessions:[] };
+      const tryLimit = Number(hw.tryLimit || 0) || 0;
+      if (tryLimit > 0 && Number(rec.count || 0) >= tryLimit) throw new Error('No tries left for this homework');
+      const token = `HWS-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      rec.count = (Number(rec.count || 0) || 0) + 1;
+      rec.sessions = Array.isArray(rec.sessions) ? rec.sessions : [];
+      rec.sessions.unshift({ token, startedAt:new Date().toISOString(), submittedAt:'', submissionId:'' });
+      store.attempts[key] = rec;
+      writeLocalStore(store);
+      return { ok:true, token, triesUsed: rec.count, tryLimit, assignment: publicAssignment(hw) };
+    }
+
+    if (action === 'submit') {
+      const student = findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
+      if (!student) throw new Error('Student ID or PIN is not correct');
+      const identity = identityFromStudent(student);
+      const hw = (store.assignments || []).find((item) => String(item.id || '') === String(payload.homeworkId || '').trim());
+      if (!hw) throw new Error('Homework was not found');
+      const key = attemptKey(identity, hw.id);
+      const rec = store.attempts[key] && typeof store.attempts[key] === 'object' ? store.attempts[key] : { count:0, sessions:[] };
+      const token = String(payload.token || '').trim();
+      const session = (rec.sessions || []).find((row) => String(row.token || '') === token);
+      if (!session) throw new Error('This homework session is not valid');
+      const answersIn = Array.isArray(payload.answers) ? payload.answers : [];
+      const mapped = {};
+      answersIn.forEach((item) => { mapped[Number(item && item.index)] = item || {}; });
+      const answers = (hw.questions || []).map((question, index) => {
+        const input = mapped[index] || {};
+        const chosen = String(input.chosen || '').trim();
+        const expected = String(question.answer || '').trim();
+        return {
+          index,
+          questionText: question.text,
+          chosen,
+          correct: !!chosen && answerMatches(chosen, expected),
+          expected,
+          timedOut: !!input.timedOut,
+          answeredAt: String(input.answeredAt || new Date().toISOString())
+        };
+      });
+      const score = answers.filter((row) => row.correct).length;
+      const questionCount = (hw.questions || []).length;
+      const percent = questionCount ? Math.round((score / questionCount) * 100) : 0;
+      const wrongAnswers = answers.filter((row) => !row.correct).map((row) => ({ index:row.index, questionText:row.questionText, chosen:row.chosen, expected:row.expected, answeredAt:row.answeredAt, timedOut:!!row.timedOut }));
+      const submissionId = `HWR-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      session.submittedAt = new Date().toISOString();
+      session.submissionId = submissionId;
+      const submission = {
+        id: submissionId,
+        homeworkId: hw.id,
+        homeworkTitle: hw.title,
+        date: hw.date,
+        studentName: identity.name,
+        studentId: identity.studentId,
+        className: identity.className,
+        grade: identity.grade,
+        identity,
+        token,
+        score,
+        percent,
+        questionCount,
+        triesUsed: Number(rec.count || 0) || 0,
+        wrongAnswersCount: wrongAnswers.length,
+        wrongAnswers,
+        answers,
+        questions: hw.questions || [],
+        submittedAt: session.submittedAt,
+        timeUp: !!payload.timeUp,
+        timerMinutes: Number(hw.timerMinutes || 0) || 0,
+        usedTimer: !!hw.useTimer
+      };
+      store.submissions = Array.isArray(store.submissions) ? store.submissions : [];
+      store.submissions.unshift(submission);
+      writeLocalStore(store);
+      return { ok:true, submission, result:{ score, percent, questionCount, wrongAnswersCount: wrongAnswers.length } };
+    }
+
+    throw new Error('Could not complete request.');
+  }
+
   async function api(action, options){
     const suffix = action ? `?action=${encodeURIComponent(action)}` : '';
-    const res = await fetch(API + suffix, Object.assign({ headers:{ 'Content-Type':'application/json' }, cache:'no-store' }, options || {}));
-    const data = await res.json().catch(()=>({ ok:false, error:'Could not complete request.' }));
-    if (!res.ok || !data.ok) throw new Error(data.error || 'Could not complete request.');
-    return data;
+    try {
+      const res = await fetch(API + suffix, Object.assign({ headers:{ 'Content-Type':'application/json' }, cache:'no-store' }, options || {}));
+      const data = await res.json().catch(()=>({ ok:false, error:'Could not complete request.' }));
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Could not complete request.');
+      return data;
+    } catch (error) {
+      return localApi(action, options || {});
+    }
   }
 
   function setStatus(msg){
