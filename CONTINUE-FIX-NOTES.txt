@@ -1,0 +1,4 @@
+Fixed in this ZIP:
+- Added a robust fallback for quiz pages (kg1/kg2/class) so the Continue button opens the level chooser even if a later script timing issue prevents the primary handler from completing
+- Ensures student identity fields are inserted on quiz pages before the Continue validation runs
+- Re-added themeQuickSwitch containers to kg1.html, kg2.html, and class.html if missing

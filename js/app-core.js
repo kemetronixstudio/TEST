@@ -4223,3 +4223,61 @@ document.addEventListener('click', function(e){
     return;
   }
 });
+
+
+
+(function(){
+  function wireQuizContinueFallback(){
+    if (document.body?.dataset?.page !== 'quiz') return;
+    var nameInput = document.getElementById('studentName');
+    var continueBtn = document.getElementById('goToLevelBtn');
+    var levelChooser = document.getElementById('levelChooser');
+    if (!nameInput || !continueBtn || !levelChooser) return;
+
+    try {
+      if (window.studentCloud && typeof window.studentCloud.ensureQuizIdentityFields === 'function') {
+        window.studentCloud.ensureQuizIdentityFields(String(document.body.dataset.grade || '').toUpperCase());
+      }
+    } catch (e) {}
+
+    if (continueBtn.dataset.fallbackWired === '1') return;
+    continueBtn.dataset.fallbackWired = '1';
+
+    continueBtn.addEventListener('click', function(){
+      if (!nameInput.value.trim()) return;
+      // If primary handler already opened chooser, do nothing.
+      setTimeout(function(){
+        if (!levelChooser.classList.contains('hidden')) return;
+
+        // fallback: only show chooser if password passes and identity is valid
+        try {
+          if (window.studentCloud && typeof window.studentCloud.collectIdentity === 'function') {
+            window.studentCloud.collectIdentity(String(document.body.dataset.grade || '').toUpperCase());
+          }
+        } catch (error) {
+          alert(error.message || 'Please complete the student details.');
+          return;
+        }
+
+        try {
+          if (typeof getQuizAccess === 'function') {
+            var gradeKey = String(document.body.dataset.grade || '').toLowerCase();
+            var access = (getQuizAccess()[gradeKey]) || { enabled:false, password:'' };
+            if (access.enabled && access.password) {
+              return; // let primary handler own password flow
+            }
+          }
+        } catch (e) {}
+
+        levelChooser.classList.remove('hidden');
+        nameInput.disabled = true;
+        continueBtn.disabled = true;
+      }, 0);
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wireQuizContinueFallback, { once:true });
+  else wireQuizContinueFallback();
+  window.addEventListener('load', wireQuizContinueFallback);
+})();
+
