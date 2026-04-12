@@ -50,3 +50,10 @@ Additional notes in this build:
 - Teacher Test Builder now includes the advanced summary container expected by admin-extra.js.
 - Legacy timer/archive keys are migrated forward automatically when old localStorage keys are found.
 - Student and homework API endpoints now reject malformed JSON with a clear 400 response and apply request throttling.
+
+
+Additional hardening in this build:
+- `/data/*` is blocked by `vercel.json` redirects so built-in account files are not publicly exposed.
+- Admin API tokens are kept in `sessionStorage` only; they are no longer persisted to `localStorage`.
+- Direct TCP Redis fallback is disabled by default. Use `ENABLE_DIRECT_REDIS_TCP=true` only when you explicitly need it. The preferred backend is KV/Upstash REST.
+- Local/static preview now supports local admin auth from the bundled hashed built-in account file.

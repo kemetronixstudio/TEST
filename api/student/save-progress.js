@@ -1,3 +1,6 @@
+const { applyCors, checkRateLimit, readJsonBody } = require('../../lib/api-security');
+const backend = require('../../lib/student-cloud-backend');
+
 
 function withCors(handler){
   return async function(req, res){
@@ -5,9 +8,6 @@ function withCors(handler){
     return handler(req, res);
   };
 }
-
-const { applyCors, checkRateLimit, readJsonBody } = require('../../lib/api-security');
-const backend = require('../../lib/student-cloud-backend');
 
 module.exports = withCors(async function handler(req, res) {
     if (req.method !== 'POST') {

@@ -1,3 +1,7 @@
+const backend = require('../../lib/homework-backend');
+const access = require('../../lib/access-accounts-backend');
+const { applyCors, setAuthCookie, checkRateLimit, readJsonBody } = require('../../lib/api-security');
+
 
 function withCors(handler){
   return async function(req, res){
@@ -5,11 +9,6 @@ function withCors(handler){
     return handler(req, res);
   };
 }
-
-const backend = require('../../lib/homework-backend');
-const access = require('../../lib/access-accounts-backend');
-const { applyCors, setAuthCookie, checkRateLimit, readJsonBody } = require('../../lib/api-security');
-
 
 module.exports = withCors(async function handler(req, res) {
     res.setHeader('Content-Type', 'application/json');

@@ -63,13 +63,27 @@
 <div id="confettiLayer"></div>
 <script>
 (function(){
+  var allowed = ['grade1','grade2','grade3','grade4','grade5','grade6'];
   try {
     var params = new URLSearchParams(location.search);
     var grade = String(params.get('grade') || '').trim().toLowerCase();
-    if (!grade) grade = 'kg1';
+    if (!allowed.includes(grade)) {
+      document.body.dataset.gradeFallback = '1';
+      grade = 'grade1';
+      window.setTimeout(function(){
+        var host = document.querySelector('.status-box') || document.querySelector('main');
+        if (!host || document.getElementById('classGradeFallbackNote')) return;
+        var note = document.createElement('div');
+        note.id = 'classGradeFallbackNote';
+        note.className = 'muted-note';
+        note.textContent = 'Grade parameter missing or invalid. Defaulted to Grade 1.';
+        host.insertBefore(note, host.firstChild);
+      }, 0);
+    }
     document.body.dataset.grade = grade;
   } catch (e) {
-    document.body.dataset.grade = 'kg1';
+    document.body.dataset.gradeFallback = '1';
+    document.body.dataset.grade = 'grade1';
   }
 })();
 </script><script src="student-cloud-client.js"></script><script src="js/app-core.js"></script></body></html>

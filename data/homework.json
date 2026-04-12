@@ -104,7 +104,7 @@
       "grade": "KG1",
       "className": "A",
       "studentId": "1",
-      "pin": "1234",
+      "pin": "pbkdf2$120000$e066151bdcec57173be1383403b1eb94$f619e9edcaf4a7be8644cccaf62a8e2aa591f52c7e9c469b81d2073a2a7bd0f1",
       "active": true,
       "createdAt": "2026-04-11T00:00:00.000Z"
     }

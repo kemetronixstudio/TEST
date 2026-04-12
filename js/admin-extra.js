@@ -138,7 +138,7 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
     window.__currentAccessAccount = account || null;
     updateSessionMini();
     try {
-      if (token) { sessionStorage.setItem(TOKEN_KEY, token); try { localStorage.setItem(TOKEN_KEY, token); localStorage.setItem(LEGACY_TOKEN_KEY, token); } catch (e) {} }
+      if (token) { sessionStorage.setItem(TOKEN_KEY, token); try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(LEGACY_TOKEN_KEY); } catch (e) {} }
       if (account) sessionStorage.setItem(ACCOUNT_KEY, JSON.stringify({ user: account.user, originalUser: account.originalUser || account.user, role: account.role }));
       else sessionStorage.removeItem(ACCOUNT_KEY);
       if (!account) {
@@ -149,9 +149,9 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
   }
   function readToken(){
     try {
-      return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY) || '';
+      return sessionStorage.getItem(TOKEN_KEY) || '';
     } catch (error) {
-      try { return localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY) || ''; } catch (e) { return ''; }
+      return '';
     }
   }
 
@@ -1291,7 +1291,7 @@ if (delStudent) { try { await api('?action=delete-student', { method:'DELETE', b
 (function(){
   const PAGE = document.body?.dataset?.page || '';
   const ADV_KEY = 'kgQuizAdvancedConfigsV1';
-  const CUSTOM_Q_KEYS = ['kgEnglishCustomQuestionsV23','kgEnglishCustomQuestionsV23'];
+  const CUSTOM_Q_KEYS = ['kgEnglishCustomQuestionsV23'];
   function readJson(key, fallback){ try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch(e){ return fallback; } }
   function writeJson(key, value){ try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){} return value; }
   function esc(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -1562,8 +1562,8 @@ if (delStudent) { try { await api('?action=delete-student', { method:'DELETE', b
   const BACKUP_KEYS = [
     'kgQuizAdvancedConfigsV1','kgQuizLevelVisibilityV1','kgQuizTimerSettingsV1','kgQuizAccessPasswordsV1',
     'kgTeacherTestV1','kgTeacherArchivedTestsV1','kgTeacherAuditLogV1','kgTeacherDashboardDataV1',
-    'kgEnglishCustomQuestionsV23','kgEnglishCustomQuestionsV23','kgQuestionOverridesV1','kgCustomClassesV1',
-    'kgAccessAccountsV1','kgStudentProgressV1','kgStudentRecordsV1','kgAttemptsLogV1','kgAnalyticsV1',
+    'kgEnglishCustomQuestionsV23','kgQuestionOverridesV1','kgCustomClassesV1',
+    'kgStudentProgressV1','kgStudentRecordsV1','kgAttemptsLogV1','kgAnalyticsV1',
     'kgPlayLeaderboardV1','kgPlayConfigV1'
   ];
   const DRAFT_KEY = 'kgAdminDraftsV2';

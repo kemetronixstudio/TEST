@@ -1,3 +1,6 @@
+const backend = require('../../lib/access-accounts-backend');
+const { applyCors, setAuthCookie, checkRateLimit, readJsonBody } = require('../../lib/api-security');
+
 
 function withCors(handler){
   return async function(req, res){
@@ -5,9 +8,6 @@ function withCors(handler){
     return handler(req, res);
   };
 }
-
-const backend = require('../../lib/access-accounts-backend');
-const { applyCors, setAuthCookie, checkRateLimit } = require('../../lib/api-security');
 
 function setJson(res, status, payload) {
   res.statusCode = status;
@@ -30,11 +30,7 @@ function getAction(req) {
 }
 
 function readBody(req) {
-  try {
-    return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  } catch (e) {
-    return {};
-  }
+  return readJsonBody(req);
 }
 
 module.exports = withCors(async function handler(req, res) {

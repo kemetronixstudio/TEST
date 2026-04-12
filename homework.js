@@ -46,6 +46,21 @@
     const nums = (store.students || []).map((row) => Number(String(row.studentId || '').replace(/\D+/g, ''))).filter((n) => Number.isFinite(n));
     return String((nums.length ? Math.max.apply(null, nums) : 0) + 1);
   }
+  async function verifyLocalSecret(input, stored){
+    const value = String(stored || '').trim();
+    if (!value) return false;
+    if (!value.startsWith('pbkdf2$')) return String(input || '').trim() === value;
+    try {
+      const parts = value.split('$');
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey('raw', enc.encode(String(input || '').trim()), { name: 'PBKDF2' }, false, ['deriveBits']);
+      const salt = parts[2].match(/.{1,2}/g).map((hex) => parseInt(hex, 16));
+      const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new Uint8Array(salt), iterations: Number(parts[1] || 120000) }, key, 256);
+      const hex = Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
+      return hex === parts[3];
+    } catch (error) { return false; }
+  }
+
   function nextStudentPin(store){
     const pins = new Set((store.students || []).map((row) => String(row.pin || '').trim()));
     for (let i = 1234; i <= 9999; i += 1) {
@@ -54,8 +69,13 @@
     }
     return String(Math.floor(1000 + Math.random() * 9000));
   }
-  function findStudent(store, studentId, pin){
-    return (store.students || []).find((row) => String(row.studentId || '').trim() === String(studentId || '').trim() && String(row.pin || '').trim() === String(pin || '').trim());
+  async function findStudent(store, studentId, pin){
+    const rows = Array.isArray(store.students) ? store.students : [];
+    for (const row of rows) {
+      if (String(row.studentId || '').trim() !== String(studentId || '').trim()) continue;
+      if (await verifyLocalSecret(pin, row.pin)) return row;
+    }
+    return null;
   }
   function identityFromStudent(student){
     return {
@@ -79,18 +99,19 @@
     return hw.classes.some((name) => normalizeText(name) === normalizeText(identity.className));
   }
   function answerMatches(a, b){ return normalizeText(a) === normalizeText(b); }
+  function decodeHtml(value){ const box = document.createElement('textarea'); box.innerHTML = String(value || ''); return box.value; }
   async function localApi(action, options){
     const payload = options && options.body ? JSON.parse(options.body || '{}') : {};
     const store = await readLocalStore();
 
     if (action === 'identify-student') {
-      const student = findStudent(store, payload.studentId, payload.pin);
+      const student = await findStudent(store, payload.studentId, payload.pin);
       if (!student) throw new Error('Student ID or PIN is not correct');
       return { ok:true, student };
     }
 
     if (action === 'available') {
-      const student = findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
+      const student = await findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
       if (!student) throw new Error('Student ID or PIN is not correct');
       const identity = identityFromStudent(student);
       const rows = (store.assignments || []).filter((hw) => canAccess(hw, identity)).map((hw) => {
@@ -103,13 +124,13 @@
     }
 
     if (action === 'start') {
-      const student = findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
+      const student = await findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
       if (!student) throw new Error('Student ID or PIN is not correct');
       const identity = identityFromStudent(student);
       const hw = (store.assignments || []).find((item) => String(item.id || '') === String(payload.homeworkId || '').trim());
       if (!hw) throw new Error('Homework was not found');
       if (!canAccess(hw, identity)) throw new Error('This homework is not available for this student');
-      if (hw.usePassword && String(payload.password || '').trim() !== String(hw.password || '').trim()) throw new Error('Wrong password');
+      if (hw.usePassword && !(await verifyLocalSecret(payload.password, hw.password))) throw new Error('Wrong password');
       const key = attemptKey(identity, hw.id);
       const rec = store.attempts[key] && typeof store.attempts[key] === 'object' ? store.attempts[key] : { count:0, sessions:[] };
       const tryLimit = Number(hw.tryLimit || 0) || 0;
@@ -124,7 +145,7 @@
     }
 
     if (action === 'submit') {
-      const student = findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
+      const student = await findStudent(store, payload.identity && payload.identity.studentId, payload.identity && payload.identity.pin);
       if (!student) throw new Error('Student ID or PIN is not correct');
       const identity = identityFromStudent(student);
       const hw = (store.assignments || []).find((item) => String(item.id || '') === String(payload.homeworkId || '').trim());
@@ -239,10 +260,17 @@
     const studentId = nextStudentId(store);
     const pin = customPin || nextStudentPin(store);
     store.students = Array.isArray(store.students) ? store.students : [];
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(String(pin)), { name: 'PBKDF2' }, false, ['deriveBits']);
+    const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: 120000 }, key, 256);
+    const saltHex = Array.from(saltBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const digestHex = Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const pinHash = `pbkdf2$120000$${saltHex}$${digestHex}`;
     store.students.push({
       id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       studentId,
-      pin,
+      pin: pinHash,
       name,
       grade,
       className,
@@ -352,11 +380,11 @@
         imageWrap.classList.add('hidden');
       }
     }
-    $('homeworkOptionsWrap').innerHTML = (q.options || []).map((opt, idx) => `<button type="button" class="option-btn" data-option="${idx}">${esc(opt)}</button>`).join('');
+    $('homeworkOptionsWrap').innerHTML = (q.options || []).map((opt, idx) => `<button type="button" class="option-btn" data-option="${idx}" data-answer="${esc(opt)}">${esc(opt)}</button>`).join('');
     document.querySelectorAll('#homeworkOptionsWrap .option-btn').forEach((btn) => {
       btn.addEventListener('click', function(){
         if (state.answers[state.index]) return;
-        chooseAnswer(this.textContent || '');
+        chooseAnswer(decodeHtml(this.getAttribute('data-answer') || this.textContent || ''));
       });
     });
   }
@@ -507,6 +535,7 @@
     }
   }
 
+  updateLocalModeUi(isLocalPreview);
   $('loadHomeworkBtn')?.addEventListener('click', renderAssignments);
   $('createHomeworkStudentBtn')?.addEventListener('click', createLocalStudent);
   $('homeworkNextBtn')?.addEventListener('click', nextQuestion);
