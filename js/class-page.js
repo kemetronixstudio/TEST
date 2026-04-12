@@ -11,7 +11,7 @@
         var note = document.createElement('div');
         note.id = 'classGradeFallbackNote';
         note.className = 'muted-note';
-        note.textContent = 'Grade parameter missing or invalid. Defaulted to Grade 1.';
+        note.textContent = 'Grade parameter missing or invalid. Showing Grade 1 until you open a specific class link.';
         host.insertBefore(note, host.firstChild);
       }
     }

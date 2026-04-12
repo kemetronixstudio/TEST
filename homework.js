@@ -11,6 +11,7 @@
   const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
   const LOCAL_KEY = 'kgHomeworkStaticStoreV1';
+  const HOMEWORK_SESSION_KEY = 'kgHomeworkActiveSessionV1';
   const PREVIEW_HOMEWORK_SEED = {
   "assignments": [
     {
@@ -124,6 +125,72 @@
   ]
 };
 
+
+  function serializeHomeworkState(){
+    if (!state || !state.assignment || !state.token || !state.identity) return null;
+    return {
+      identity: Object.assign({}, state.identity || {}),
+      assignment: Object.assign({}, state.assignment || {}),
+      token: String(state.token || '').trim(),
+      index: Math.max(0, Number(state.index || 0)),
+      answers: Array.isArray(state.answers) ? state.answers.slice() : [],
+      timeLeft: state.timeLeft == null ? null : Number(state.timeLeft || 0),
+      deadlineTs: Number(state.deadlineTs || 0),
+      savedAt: Date.now()
+    };
+  }
+  function persistHomeworkState(){
+    try {
+      const payload = serializeHomeworkState();
+      if (!payload) localStorage.removeItem(HOMEWORK_SESSION_KEY);
+      else localStorage.setItem(HOMEWORK_SESSION_KEY, JSON.stringify(payload));
+    } catch (error) {}
+  }
+  function clearHomeworkState(){
+    try { localStorage.removeItem(HOMEWORK_SESSION_KEY); } catch (error) {}
+  }
+  function readPersistedHomeworkState(){
+    try {
+      const raw = localStorage.getItem(HOMEWORK_SESSION_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return null;
+      if (!data.assignment || !data.token || !data.identity) return null;
+      data.index = Math.max(0, Number(data.index || 0));
+      data.answers = Array.isArray(data.answers) ? data.answers : [];
+      data.timeLeft = data.timeLeft == null ? null : Number(data.timeLeft || 0);
+      data.deadlineTs = Number(data.deadlineTs || 0);
+      return data;
+    } catch (error) {
+      return null;
+    }
+  }
+  function applyPersistedHomeworkState(saved){
+    if (!saved || !saved.assignment || !saved.token || !saved.identity) return false;
+    state = {
+      identity: Object.assign({}, saved.identity || {}),
+      assignment: Object.assign({}, saved.assignment || {}),
+      token: String(saved.token || '').trim(),
+      index: Math.max(0, Math.min(Number(saved.index || 0), Math.max(0, ((saved.assignment.questions || []).length || 1) - 1))),
+      answers: Array.isArray(saved.answers) ? saved.answers.slice() : [],
+      timeLeft: saved.timeLeft == null ? null : Number(saved.timeLeft || 0),
+      deadlineTs: Number(saved.deadlineTs || 0),
+      submitting: false,
+      autoNextTimer: null
+    };
+    if ($('homeworkStudentId')) $('homeworkStudentId').value = String(state.identity.studentId || '');
+    if ($('homeworkStudentPin')) $('homeworkStudentPin').value = String(state.identity.pin || '');
+    const box = $('homeworkVerifiedBox');
+    if (box) box.textContent = `Verified: ${state.identity.name || 'Student'} - ${state.identity.grade || '-'} / ${state.identity.className || '-'}`;
+    $('homeworkStartCard').classList.add('hidden');
+    $('homeworkDoneSection').classList.add('hidden');
+    $('homeworkQuizSection').classList.remove('hidden');
+    setStatus('Resumed your homework session.');
+    renderQuestion();
+    startTimer();
+    persistHomeworkState();
+    return true;
+  }
   function normalizeText(value){ return String(value || '').trim().toLowerCase(); }
   function slugify(value){ return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
   function ensureStoreShape(raw){
@@ -517,6 +584,7 @@
       btn.classList.add(String(btn.textContent || '').trim() === String(choice || '').trim() ? 'selected' : 'disabled');
     });
     updateQuizHead();
+    persistHomeworkState();
     window.clearTimeout(state.autoNextTimer);
     state.autoNextTimer = window.setTimeout(() => {
       if (!state || state.submitting) return;
@@ -533,6 +601,7 @@
     window.clearTimeout(state.autoNextTimer);
     state.index += 1;
     if (state.index >= state.assignment.questions.length) return finishHomework(false);
+    persistHomeworkState();
     renderQuestion();
   }
 
@@ -551,18 +620,23 @@
     stopTimer();
     if (!state.assignment.useTimer || !state.timeLeft) {
       state.timeLeft = null;
+      state.deadlineTs = 0;
       updateQuizHead();
       return;
     }
-    updateQuizHead();
-    timer = setInterval(() => {
-      state.timeLeft = Math.max(0, Number(state.timeLeft || 0) - 1);
+    const now = Date.now();
+    state.deadlineTs = Number(state.deadlineTs || 0) > now ? Number(state.deadlineTs || 0) : (now + (Number(state.timeLeft || 0) * 1000));
+    const tick = () => {
+      state.timeLeft = Math.max(0, Math.ceil((Number(state.deadlineTs || 0) - Date.now()) / 1000));
       updateQuizHead();
+      persistHomeworkState();
       if (state.timeLeft <= 0) {
         stopTimer();
         finishHomework(true);
       }
-    }, 1000);
+    };
+    tick();
+    timer = setInterval(tick, 250);
   }
 
   async function finishHomework(timeUp){
@@ -602,6 +676,7 @@
         }
       }
 
+      clearHomeworkState();
       $('homeworkQuizSection').classList.add('hidden');
       $('homeworkDoneSection').classList.remove('hidden');
       $('homeworkDoneText').textContent = timeUp
@@ -637,6 +712,7 @@
         index: 0,
         answers: [],
         timeLeft: data.assignment.useTimer ? Number(data.assignment.timerMinutes || 0) * 60 : null,
+        deadlineTs: data.assignment.useTimer ? (Date.now() + (Number(data.assignment.timerMinutes || 0) * 60 * 1000)) : 0,
         submitting: false,
         autoNextTimer: null
       };
@@ -646,12 +722,15 @@
       setStatus('');
       renderQuestion();
       startTimer();
+      persistHomeworkState();
     } catch (error) {
       setStatus(error.message || 'Could not start homework.');
     }
   }
 
   updateLocalModeUi(false);
+  const savedHomeworkState = readPersistedHomeworkState();
+  if (savedHomeworkState) applyPersistedHomeworkState(savedHomeworkState);
   $('loadHomeworkBtn')?.addEventListener('click', renderAssignments);
   $('createHomeworkStudentBtn')?.addEventListener('click', createLocalStudent);
   $('homeworkNextBtn')?.addEventListener('click', nextQuestion);

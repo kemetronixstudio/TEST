@@ -115,7 +115,7 @@ function resolvePlayQuestionImage(image){
   const AUTO_NEXT_STORAGE_KEY = 'kgPlayTestAutoNext';
   const QUESTION_SECONDS = 20;
   const GRADE_OPTIONS = [
-    ['KG1','KG1'],['KG2','KG2'],['Grade 1','Grade 1'],['Grade 2','Grade 2'],['Grade 3','Grade 3'],['Grade 4','Grade 4'],['Grade 5','Grade 5'],['Grade 6','Grade 6']
+    ['KG1','KG1'],['KG2','KG2'],['grade1','Grade 1'],['grade2','Grade 2'],['grade3','Grade 3'],['grade4','Grade 4'],['grade5','Grade 5'],['grade6','Grade 6']
   ];
   const I18N = {
     en: {

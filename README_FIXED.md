@@ -59,3 +59,17 @@ Additional hardening in this build:
 - Admin API tokens are kept in `sessionStorage` only; they are no longer persisted to `localStorage`.
 - Direct TCP Redis fallback is disabled by default. Use `ENABLE_DIRECT_REDIS_TCP=true` only when you explicitly need it. The preferred backend is KV/Upstash REST.
 - Local/static preview now supports local admin auth from the bundled hashed built-in account file.
+
+
+Production notes:
+- Set ALLOWED_ORIGINS to your live site origin (for example https://your-domain.vercel.app).
+- Configure KV/Upstash for durable rate limiting and persistent server-side data.
+- The /lib and /data paths are blocked in vercel.json for public deployments.
+
+
+V17 notes:
+- Homework student/homework passwords now require PBKDF2-hashed secrets only.
+- Homework available requests are rate-limited too.
+- Homework countdown now uses a real deadline timestamp to avoid background-tab drift.
+- Admin Students Manager now accepts an optional custom Student ID.
+- Play grade values are normalized to canonical keys (grade1..grade6).

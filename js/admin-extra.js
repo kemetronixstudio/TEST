@@ -801,6 +801,7 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
   }
   async function exportExcel(){
     status('Preparing Excel export...');
+    if (typeof XLSX === 'undefined') { status('Excel tools are not available right now. Please reload the page and try again.'); return; }
     try {
       const filters = getFilters();
       const q = encodeURIComponent(filters.q);
@@ -1154,6 +1155,7 @@ function normalizeAdminImagePath(value){
 
   async function exportHomeworkExcel(){
     const status = $('homeworkReportStatus') || $('homeworkAnalyticsStatus');
+    if (typeof XLSX === 'undefined') { if (status) status.textContent = 'Excel tools are not available right now. Please reload the page and try again.'; return; }
     try {
       const filters = reportFilters();
       const query = `?action=reports&q=${encodeURIComponent(filters.q)}&className=${encodeURIComponent(filters.className)}&grade=${encodeURIComponent(filters.grade)}&fromDate=${encodeURIComponent(filters.fromDate)}&toDate=${encodeURIComponent(filters.toDate)}`;
@@ -1189,17 +1191,20 @@ function normalizeAdminImagePath(value){
 
   async function saveStudentFromAdmin(){
     const name = String($('studentNameInput')?.value || '').trim();
+    const studentId = String($('studentIdInput')?.value || '').trim();
     const grade = String($('studentGradeInput')?.value || 'KG1').trim();
     const className = String($('studentClassInput')?.value || '').trim();
     const pin = String($('studentPinInput')?.value || '').trim();
     if (!name || !className) { const st = $('studentsStatus'); if (st) st.textContent = 'Enter student name and class.'; return; }
     try {
-      const data = await api('?action=save-student', { method:'POST', body: JSON.stringify({ name, grade, className, pin }) });
+      const data = await api('?action=save-student', { method:'POST', body: JSON.stringify({ name, studentId, grade, className, pin }) });
       $('studentNameInput').value = '';
+      if ($('studentIdInput')) $('studentIdInput').value = '';
       $('studentClassInput').value = '';
       if ($('studentPinInput')) $('studentPinInput').value = '';
+      const statusText = data && data.plainPin ? ('Student saved. Student ID: ' + String((data.student && data.student.studentId) || studentId || '-') + ' | PIN: ' + data.plainPin) : 'Student saved.';
       await renderStudents();
-      const st = $('studentsStatus'); if (st) st.textContent = data && data.plainPin ? ('Student saved. PIN: ' + data.plainPin) : 'Student saved.';
+      const st = $('studentsStatus'); if (st) st.textContent = statusText;
     } catch (error) {
       const st = $('studentsStatus'); if (st) st.textContent = error.message || 'Could not save student.';
     }

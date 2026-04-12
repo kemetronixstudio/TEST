@@ -78,6 +78,8 @@ module.exports = withCors(async function handler(req, res) {
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }
       if (action === 'available') {
+        const limited = await checkRateLimit(req, 'homework-available:' + String((body.identity && body.identity.studentId) || body.studentId || body.id || '').trim().toLowerCase());
+        if (!limited.ok) { res.statusCode = 429; res.end(JSON.stringify({ ok:false, error:'Too many requests. Try again in ' + limited.retryAfter + ' seconds.' })); return; }
         const data = await backend.listForStudent(body.identity || body);
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }
