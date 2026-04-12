@@ -16,6 +16,7 @@
             <div id="homeworkVerifiedBox" class="muted-note"></div>
             <div id="homeworkStatus" class="muted-note"></div>
             <div id="homeworkLocalModeNote" class="muted-note hidden">Teacher-managed accounts can be created in Admin → Students Manager. For local static preview, you can also create a local demo student below.</div>
+            <div class="action-row wrap-row"><button class="ghost-btn hidden" id="toggleHomeworkRegisterBtn" type="button">Show Local Registration</button></div>
             <div id="homeworkRegisterCard" class="stored-question hidden">
               <h4>Create Local Demo Student</h4>
               <p class="muted-note">This saves only in this browser for offline or localhost testing.</p>
@@ -25,10 +26,7 @@
                 <input id="homeworkRegisterClass" placeholder="Class name">
                 <input id="homeworkRegisterPin" placeholder="PIN (optional)">
               </div>
-              <div class="action-row wrap-row">
-                <button class="ghost-btn" id="toggleHomeworkRegisterBtn" type="button">Show Local Registration</button>
-                <button class="main-btn hidden" id="createHomeworkStudentBtn" type="button">Create Local Student</button>
-              </div>
+              <div class="action-row wrap-row"><button class="main-btn hidden" id="createHomeworkStudentBtn" type="button">Create Local Student</button></div>
               <div id="homeworkRegisterStatus" class="muted-note"></div>
             </div>
           </div>

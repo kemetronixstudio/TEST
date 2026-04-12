@@ -15,7 +15,7 @@ module.exports = withCors(async function handler(req, res) {
   try {
     const url = new URL(req.url || '/api/homework', 'http://localhost');
     const action = String(url.searchParams.get('action') || '').trim().toLowerCase();
-    const body = readJsonBody(req);
+    const body = req.method === 'POST' || req.method === 'DELETE' ? readJsonBody(req) : {};
     const isStudentAction = action === 'available' || action === 'start' || action === 'submit' || action === 'identify-student' || action === 'parent-summary';
     if (!isStudentAction) {
       const auth = await access.requireAuthorized(req, 'teacherTest');
@@ -74,9 +74,6 @@ module.exports = withCors(async function handler(req, res) {
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }
       if (action === 'save-student') {
-        const auth = await access.requireAuthorized(req, 'teacherTest');
-        if (!auth.ok) { res.statusCode = auth.status; res.end(JSON.stringify({ ok:false, error:auth.error })); return; }
-        setAuthCookie(req, res, auth.token);
         const data = await backend.saveStudent(body);
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }

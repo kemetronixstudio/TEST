@@ -2,7 +2,7 @@
   if (typeof document === 'undefined' || !document.body || document.body.dataset.page !== 'homework') return;
   const API = '/api/homework';
   const $ = (id) => document.getElementById(id);
-  const studentCloud = window.studentCloud || null;
+  function getStudentCloud(){ return window.studentCloud || null; }
   let state = null;
   let timer = null;
   let availableRows = [];
@@ -581,6 +581,7 @@
         })
       });
 
+      const studentCloud = getStudentCloud();
       if (studentCloud && typeof studentCloud.submitResult === 'function') {
         try {
           await studentCloud.submitResult({

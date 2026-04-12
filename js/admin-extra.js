@@ -344,9 +344,9 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
           + '<div class="account-meta-top"><strong class="account-name">' + escapeText(account.user || '') + '</strong><div class="account-badges"><span class="role-badge">' + escapeText(roleText) + '</span> <span class="state-badge">' + escapeText(stateText) + '</span></div></div>'
           + '<div class="account-perms-line">' + escapeText(perms) + '</div>'
           + '<div class="account-actions">'
-          + '<button class="ghost-btn" type="button" onclick="accEditByUser(\'' + safeUser + '\')">' + escapeText(lang()==='ar' ? 'تعديل' : 'Edit') + '</button>'
-          + '<button class="ghost-btn" type="button" onclick="accChangePassByUser(\'' + safeUser + '\')">' + escapeText(lang()==='ar' ? 'كلمة المرور' : 'Password') + '</button>'
-          + '<button class="danger-btn" type="button" onclick="accDeleteByUser(\'' + safeUser + '\')">' + escapeText(t('deleteAccount', 'Delete')) + '</button>'
+          + '<button class="ghost-btn js-acc-edit" type="button" data-user="' + safeUser + '">' + escapeText(lang()==='ar' ? 'تعديل' : 'Edit') + '</button>'
+          + '<button class="ghost-btn js-acc-pass" type="button" data-user="' + safeUser + '">' + escapeText(lang()==='ar' ? 'كلمة المرور' : 'Password') + '</button>'
+          + '<button class="danger-btn js-acc-delete" type="button" data-user="' + safeUser + '">' + escapeText(t('deleteAccount', 'Delete')) + '</button>'
           + '</div></div>';
       }).join('');
     } catch (error) {
@@ -591,6 +591,9 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
       clearForm();
       showStatus(lang()==='ar' ? 'تم مسح النموذج.' : 'Form cleared.', 'info');
     });
+
+    const exportDataBtn = cloneButton('exportDataBtn');
+    if (exportDataBtn) exportDataBtn.addEventListener('click', function(event){ event.preventDefault(); if (typeof window.__kgSafeExportData === 'function') window.__kgSafeExportData(); });
 
     const adminLogoutBtn = cloneButton('adminLogoutBtn');
     if (adminLogoutBtn) adminLogoutBtn.addEventListener('click', function(event){ event.preventDefault(); logout(); });
@@ -997,6 +1000,8 @@ function normalizeAdminImagePath(value){
       .filter(Boolean)
       .map((line) => {
         const parts = line.split('|').map((p) => p.trim()).filter(Boolean);
+        if (parts.length < 4) return null;
+        if (parts.length === 4) return { text:parts[0], options:parts.slice(1, 3), answer:parts[3], skill:'Homework', type:'TrueFalse', image:null };
         if (parts.length < 6) return null;
         return { text:parts[0], options:parts.slice(1, 5), answer:parts[5], skill:'Homework', type:'Question', image:null };
       })
@@ -1174,7 +1179,7 @@ function normalizeAdminImagePath(value){
     try {
       const data = await api(`?action=list-students&q=${encodeURIComponent(search)}`);
       const rows = Array.isArray(data.rows) ? data.rows : [];
-      body.innerHTML = rows.map((row) => `<tr><td>${esc(row.studentId)}</td><td>${esc(row.pin)}</td><td>${esc(row.name)}</td><td>${esc(row.grade)}</td><td>${esc(row.className)}</td><td><button class="ghost-btn small-btn delete-student-btn" data-id="${esc(row.id)}" type="button">Delete</button></td></tr>`).join('') || '<tr><td colspan="6">No students yet.</td></tr>';
+      body.innerHTML = rows.map((row) => `<tr><td>${esc(row.studentId)}</td><td>${esc(row.pinLabel || row.pin || 'Stored securely')}</td><td>${esc(row.name)}</td><td>${esc(row.grade)}</td><td>${esc(row.className)}</td><td><button class="ghost-btn small-btn delete-student-btn" data-id="${esc(row.id)}" type="button">Delete</button></td></tr>`).join('') || '<tr><td colspan="6">No students yet.</td></tr>';
       const st = $('studentsStatus'); if (st) st.textContent = `${rows.length} student(s).`;
     } catch (error) {
       if (body) body.innerHTML = '<tr><td colspan="6">Could not load students.</td></tr>';
@@ -1186,12 +1191,15 @@ function normalizeAdminImagePath(value){
     const name = String($('studentNameInput')?.value || '').trim();
     const grade = String($('studentGradeInput')?.value || 'KG1').trim();
     const className = String($('studentClassInput')?.value || '').trim();
+    const pin = String($('studentPinInput')?.value || '').trim();
     if (!name || !className) { const st = $('studentsStatus'); if (st) st.textContent = 'Enter student name and class.'; return; }
     try {
-      await api('?action=save-student', { method:'POST', body: JSON.stringify({ name, grade, className }) });
+      const data = await api('?action=save-student', { method:'POST', body: JSON.stringify({ name, grade, className, pin }) });
       $('studentNameInput').value = '';
       $('studentClassInput').value = '';
+      if ($('studentPinInput')) $('studentPinInput').value = '';
       await renderStudents();
+      const st = $('studentsStatus'); if (st) st.textContent = data && data.plainPin ? ('Student saved. PIN: ' + data.plainPin) : 'Student saved.';
     } catch (error) {
       const st = $('studentsStatus'); if (st) st.textContent = error.message || 'Could not save student.';
     }

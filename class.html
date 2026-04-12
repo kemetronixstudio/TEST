@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Cairo:wght@400;600;700;800&family=Noto+Naskh+Arabic:wght@600;700&display=swap" rel="stylesheet"><link rel="manifest" href="manifest.json"><link rel="icon" type="image/png" sizes="192x192" href="assets/icons/dreamers-192.png"><link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"><meta name="theme-color" content="#ffd54f"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="remove-empty-box.css"><title>Class Quiz</title></head><body  data-page="quiz">
 <div class="floating-shapes"></div>
-<header class="top-shell subpage-top-shell"><a class="back-link top-home-link" href="index.html" data-i18n="homeBtn">⬅ Home</a><div class="teacher-topline" data-i18n="teacherTopline">Dr. Tarek 01032188008</div><div class="lang-switch"><button class="lang-btn active" data-lang="en">EN</button><button class="lang-btn" data-lang="ar">AR</button></div></header>
+<header class="top-shell subpage-top-shell top-shell-inline"><div class="header-left"><a class="back-link top-home-link" href="index.html" data-i18n="homeBtn">⬅ Home</a><div class="lang-switch"><button class="lang-btn active" data-lang="en">EN</button><button class="lang-btn" data-lang="ar">AR</button></div></div><div class="header-center"><div class="teacher-topline" data-i18n="teacherTopline">Dr. Tarek 01032188008</div></div><div class="header-right"><div class="theme-quick-switch" id="themeQuickSwitch"></div><a class="tiny-admin-link" href="admin.html" title="Teacher Area">★</a></div></header>
 <main class="container page-wrap">
   <div class="nav-row nav-row-hidden"></div>
   <section class="card setup-card" id="setupCard">
@@ -61,28 +61,4 @@
   </section>
 </main>
 <div id="confettiLayer"></div>
-<script>
-(function(){
-  var allowed = ['grade1','grade2','grade3','grade4','grade5','grade6'];
-  try {
-    var params = new URLSearchParams(location.search);
-    var grade = String(params.get('grade') || '').trim().toLowerCase();
-    if (!allowed.includes(grade)) {
-      document.body.dataset.gradeFallback = '1';
-      grade = 'grade1';
-      var host = document.querySelector('.status-box') || document.querySelector('main');
-      if (host && !document.getElementById('classGradeFallbackNote')) {
-        var note = document.createElement('div');
-        note.id = 'classGradeFallbackNote';
-        note.className = 'muted-note';
-        note.textContent = 'Grade parameter missing or invalid. Defaulted to Grade 1.';
-        host.insertBefore(note, host.firstChild);
-      }
-    }
-    document.body.dataset.grade = grade;
-  } catch (e) {
-    document.body.dataset.gradeFallback = '1';
-    document.body.dataset.grade = 'grade1';
-  }
-})();
-</script><script src="student-cloud-client.js"></script><script src="js/app-core.js"></script></body></html>
+<script src="js/class-page.js"></script><script src="student-cloud-client.js"></script><script src="js/app-core.js"></script></body></html>

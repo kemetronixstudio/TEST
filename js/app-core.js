@@ -1065,7 +1065,7 @@ function renderQuestion(){
 }
 async function makeCertificatePdfBlob(){ const area = $('#certificateArea'); const canvas = await html2canvas(area, {scale:2, backgroundColor:'#fffdf4', useCORS:true}); const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf; const pdf = new jsPDF('p','pt','a4'); const pageWidth = pdf.internal.pageSize.getWidth(); const pageHeight = pdf.internal.pageSize.getHeight(); const ratio = Math.min((pageWidth-40)/canvas.width, (pageHeight-40)/canvas.height); const w = canvas.width*ratio, h = canvas.height*ratio; pdf.addImage(imgData,'PNG',(pageWidth-w)/2,20,w,h); return pdf.output('blob'); }
 function renderCertificate(){
-  const data = readJson(storeKeys.cert, null); if (!data || !$('#certificateArea')) return; const lang = getLang(); document.body.dataset.lang = lang; const title = lang === 'ar' ? 'شهادة تقدير' : translations[lang].certificateTitle; if (window.studentCloud && typeof window.studentCloud.renderInviteCard === 'function') window.studentCloud.renderInviteCard(data); $('#certificateArea').setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr'); $('#certificateArea').setAttribute('lang', lang === 'ar' ? 'ar' : 'en'); $('#certTitle').innerText = title; $('#certTitle').classList.toggle('arabic-title', lang === 'ar'); $('#certTopText').innerText = title; $('#certSubtitle').textContent = translations[lang].presentedTo; $('#certStudentName').textContent = data.studentName; $('#certMessage').textContent = translations[lang].completedMsg; $('#labelGrade').textContent = translations[lang].grade; $('#labelLevel').textContent = translations[lang].level; $('#labelScore').textContent = translations[lang].score; $('#labelDate').textContent = translations[lang].date; $('#labelStrengths').textContent = translations[lang].strengths; $('#labelWeak').textContent = translations[lang].focus; $('#labelAdvice').textContent = translations[lang].advice; $('#labelTeacher').textContent = translations[lang].teacher; $('#labelResult').textContent = translations[lang].result; $('#certGrade').textContent = data.className ? `${data.grade} • ${data.className}` : data.grade; $('#certLevel').textContent = `${data.quizLevel} / ${data.questionCount}`; $('#certScore').textContent = `${data.score} (${data.percent}%)`; $('#certDate').textContent = data.date; $('#certStrengths').textContent = mappedSkills(data.strengths).join(', '); $('#certWeaknesses').textContent = data.weaknesses.length ? mappedSkills(data.weaknesses).join(', ') : translations[lang].noMajor; $('#certAdvice').textContent = lang === 'ar' ? smartAdvice(data.weaknesses) : data.advice; $('#certRemark').textContent = resultRemark(data.percent); const homeUrl = (location.origin && location.origin !== 'null' ? location.origin + location.pathname.replace('certificate.html','index.html') : 'index.html'); const certQrTarget = $('#certQrImg') || $('#certQr'); if (certQrTarget) certQrTarget.src = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(homeUrl)}`;
+  const data = readJson(storeKeys.cert, null); if (!data || !$('#certificateArea')) return; const lang = getLang(); document.body.dataset.lang = lang; const title = lang === 'ar' ? 'شهادة تقدير' : translations[lang].certificateTitle; if (window.studentCloud && typeof window.studentCloud.renderInviteCard === 'function') window.studentCloud.renderInviteCard(data); $('#certificateArea').setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr'); $('#certificateArea').setAttribute('lang', lang === 'ar' ? 'ar' : 'en'); $('#certTitle').innerText = title; $('#certTitle').classList.toggle('arabic-title', lang === 'ar'); $('#certTopText').innerText = title; $('#certSubtitle').textContent = translations[lang].presentedTo; $('#certStudentName').textContent = data.studentName; $('#certMessage').textContent = translations[lang].completedMsg; $('#labelGrade').textContent = translations[lang].grade; $('#labelLevel').textContent = translations[lang].level; $('#labelScore').textContent = translations[lang].score; $('#labelDate').textContent = translations[lang].date; $('#labelStrengths').textContent = translations[lang].strengths; $('#labelWeak').textContent = translations[lang].focus; $('#labelAdvice').textContent = translations[lang].advice; $('#labelTeacher').textContent = translations[lang].teacher; $('#labelResult').textContent = translations[lang].result; $('#certGrade').textContent = data.className ? `${data.grade} • ${data.className}` : data.grade; $('#certLevel').textContent = `${data.quizLevel} / ${data.questionCount}`; $('#certScore').textContent = `${data.score} (${data.percent}%)`; $('#certDate').textContent = data.date; $('#certStrengths').textContent = mappedSkills(data.strengths).join(', '); $('#certWeaknesses').textContent = data.weaknesses.length ? mappedSkills(data.weaknesses).join(', ') : translations[lang].noMajor; $('#certAdvice').textContent = lang === 'ar' ? smartAdvice(data.weaknesses) : data.advice; $('#certRemark').textContent = resultRemark(data.percent); const homeUrl = (location.origin && location.origin !== 'null' ? location.origin + location.pathname.replace('certificate.html','index.html') : 'index.html'); const certQrImg = document.getElementById('certQrImg'); if (certQrImg) certQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(homeUrl)}`;
   $('#downloadPdfBtn')?.addEventListener('click', async ()=>{ const blob = await makeCertificatePdfBlob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${data.studentName}-certificate.pdf`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); });
   $('#shareCertBtn')?.addEventListener('click', async ()=>{ const blob = await makeCertificatePdfBlob(); const file = new File([blob], `${data.studentName}-certificate.pdf`, {type:'application/pdf'}); if (navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({title:'Certificate', files:[file], text:`${data.studentName} - ${data.percent}%`}); } else { window.open(`https://wa.me/?text=${encodeURIComponent(`${data.studentName} finished ${data.grade} with ${data.percent}%`)}`,'_blank'); } });
 }
@@ -4897,3 +4897,100 @@ document.addEventListener('click', function(e){
   migrateStorageKey('kgEnglishTimerSettingsV21', 'kgEnglishTimerSettingsV23');
   migrateStorageKey('kgEnglishArchivedTeacherTestsV382', 'kgEnglishArchivedTeacherTestsV23');
 })();
+
+
+/* ---- BEGIN v14-hardening-patch.js ---- */
+(function(){
+  function normalizeUserValue(value){ return String(value || '').trim().toLowerCase(); }
+  function safeAccountMetaList(){
+    try {
+      var raw = JSON.parse(localStorage.getItem('kgEnglishAccessAccountsV26') || '[]');
+      return (Array.isArray(raw) ? raw : []).map(function(item){
+        if (!item || typeof item !== 'object') return null;
+        var role = String(item.role || 'user').trim().toLowerCase() === 'admin' ? 'admin' : 'user';
+        var user = String(item.user || item.username || '').trim();
+        if (!user) return null;
+        return { user:user, role:role, permissions:Array.isArray(item.permissions) ? item.permissions.slice() : [] };
+      }).filter(Boolean);
+    } catch (error) { return []; }
+  }
+  try {
+    window.getAccessAccounts = safeAccountMetaList;
+    getAccessAccounts = safeAccountMetaList;
+  } catch (error) {}
+
+  async function backendAwareAdminLogin(event){
+    if (event) {
+      event.preventDefault();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    }
+    var user = String(document.getElementById('adminUser') && document.getElementById('adminUser').value || '').trim();
+    var pass = String(document.getElementById('adminPass') && document.getElementById('adminPass').value || '').trim();
+    var account = null;
+    if (typeof window.__kgAuthenticateAdminLocal === 'function') {
+      try { account = await window.__kgAuthenticateAdminLocal(user, pass); } catch (error) {}
+    }
+    if (!account && typeof window.tryBackendAdminLogin === 'function') {
+      try { account = await window.tryBackendAdminLogin(user, pass); } catch (error) {}
+    }
+    if (!account) {
+      alert((typeof getLang === 'function' && getLang() === 'ar') ? 'اسم المشرف أو كلمة المرور غير صحيحة.' : 'Wrong admin name or password.');
+      return;
+    }
+    if (typeof window.__kgStableOpenAdminPanel === 'function') return window.__kgStableOpenAdminPanel(account);
+    var loginCard = document.getElementById('adminLoginCard');
+    var panel = document.getElementById('adminPanel');
+    if (loginCard) loginCard.classList.add('hidden');
+    if (panel) panel.classList.remove('hidden');
+  }
+  window.__kgStableAdminLogin = backendAwareAdminLogin;
+
+  function bindFinalAdminButtons(){
+    if (!document.body || document.body.dataset.page !== 'admin') return;
+    var loginBtn = document.getElementById('adminLoginBtn');
+    if (loginBtn && loginBtn.parentNode) {
+      var clone = loginBtn.cloneNode(true);
+      clone.dataset.v14LoginBound = '1';
+      loginBtn.parentNode.replaceChild(clone, loginBtn);
+      clone.addEventListener('click', backendAwareAdminLogin);
+    }
+  }
+
+  function safeExportData(){
+    var data = {
+      progress: (typeof getProgress === 'function') ? getProgress() : {},
+      records: (typeof getRecords === 'function') ? getRecords() : [],
+      attemptsLog: (typeof getAttemptsLog === 'function') ? getAttemptsLog() : [],
+      analytics: (typeof getAnalytics === 'function') ? getAnalytics() : {},
+      customQuestions: (typeof getCustomQuestions === 'function') ? getCustomQuestions() : [],
+      questionOverrides: (typeof getQuestionOverrides === 'function') ? getQuestionOverrides() : {},
+      levelVisibility: (typeof getLevelVisibility === 'function') ? getLevelVisibility() : {},
+      accessAccounts: safeAccountMetaList()
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'kg-app-data.json';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+  }
+  window.__kgSafeExportData = safeExportData;
+
+  function bindSafeExport(){
+    if (!document.body || document.body.dataset.page !== 'admin') return;
+    var btn = document.getElementById('exportDataBtn');
+    if (!btn || !btn.parentNode) return;
+    var clone = btn.cloneNode(true);
+    btn.parentNode.replaceChild(clone, btn);
+    clone.addEventListener('click', function(event){ event.preventDefault(); safeExportData(); });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ bindFinalAdminButtons(); bindSafeExport(); }, { once:true });
+  } else {
+    bindFinalAdminButtons();
+    bindSafeExport();
+  }
+})();
+/* ---- END v14-hardening-patch.js ---- */
