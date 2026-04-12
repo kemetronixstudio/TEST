@@ -30,7 +30,9 @@
     return safe;
   }
   function localIdentity(payload){ return Object.assign({ name:'', studentId:'', grade:'', className:'', isGuest:false }, payload || {}); }
-  function resultKey(identity, quizKey){ return [String(identity.grade || '').trim().toUpperCase(), String(identity.className || '').trim().toLowerCase(), String(identity.studentId || '').trim().toLowerCase(), String(identity.name || '').trim().toLowerCase(), String(quizKey || '').trim()].join('||'); }
+  function resultKeyPart(value){ return encodeURIComponent(String(value || '').trim().toLowerCase()); }
+  function resultKey(identity, quizKey){ return ['v2', resultKeyPart(String(identity.grade || '').trim().toUpperCase()), resultKeyPart(identity.className || ''), resultKeyPart(identity.studentId || ''), resultKeyPart(identity.name || ''), resultKeyPart(quizKey || '')].join('::'); }
+  function legacyResultKey(identity, quizKey){ return [String(identity.grade || '').trim().toUpperCase(), String(identity.className || '').trim().toLowerCase(), String(identity.studentId || '').trim().toLowerCase(), String(identity.name || '').trim().toLowerCase(), String(quizKey || '').trim()].join('||'); }
   async function post(path, payload){
     try {
       const res = await fetch(API_BASE + path, {
@@ -49,8 +51,9 @@
       const quizKey = String((payload && (payload.quizKey || payload.quizId || payload.quiz)) || '').trim();
       if (path === '/start') {
         const key = resultKey(identity, quizKey);
-        const session = store.sessions[key] || null;
-        return { ok:true, identity, quizKey, progress: session && session.state ? session.state : null, result: store.results[key] || null };
+        const legacyKey = legacyResultKey(identity, quizKey);
+        const session = store.sessions[key] || store.sessions[legacyKey] || null;
+        return { ok:true, identity, quizKey, progress: session && session.state ? session.state : null, result: store.results[key] || store.results[legacyKey] || null };
       }
       if (path === '/save-progress') {
         const key = resultKey(identity, quizKey);

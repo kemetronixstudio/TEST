@@ -8,7 +8,7 @@
     <p data-i18n="adminIntro">Use one of the admin accounts to manage records and questions.</p>
     <div class="admin-accounts-note"><strong data-i18n="adminsLabel">Admins:</strong> <span data-i18n="adminsNames">KEMETRONIX / Dr. Tarek</span></div>
     <input id="adminUser" data-placeholder-i18n="adminNamePlaceholder" placeholder="Admin name">
-    <input id="adminPass" data-placeholder-i18n="passwordPlaceholder" placeholder="Password" type="password">
+    <input id="adminPass" data-placeholder-i18n="passwordPlaceholder" placeholder="Password" type="password" autocomplete="off">
     <button class="main-btn" id="adminLoginBtn" data-i18n="openDashboard">Open Dashboard</button>
     
   </section>
@@ -105,7 +105,7 @@
       <div class="section-head"><h2>Homework Analytics</h2><div class="section-head-actions"><button class="ghost-btn collapse-toggle-btn" id="toggleHomeworkAnalyticsBtn" type="button">Expand</button><button class="ghost-btn" id="refreshHomeworkAnalyticsBtn" type="button">Refresh</button><button class="ghost-btn" id="exportHomeworkReportsExcelBtn" type="button">Export Homework Excel</button></div></div>
       <div id="homeworkAnalyticsBody" class="admin-collapsible-body collapsed-body">
       <div class="editor-grid">
-        <select id="homeworkAnalyticsGradeFilter"><option value="">All grades</option><option value="KG1">KG1</option><option value="KG2">KG2</option></select>
+        <select id="homeworkAnalyticsGradeFilter"><option value="">All grades</option><option value="KG1">KG1</option><option value="KG2">KG2</option><option value="Grade 1">Grade 1</option><option value="Grade 2">Grade 2</option><option value="Grade 3">Grade 3</option><option value="Grade 4">Grade 4</option><option value="Grade 5">Grade 5</option><option value="Grade 6">Grade 6</option></select>
         <input id="homeworkAnalyticsClassFilter" placeholder="Filter by class">
         <input id="homeworkAnalyticsFromDate" type="date">
         <input id="homeworkAnalyticsToDate" type="date">

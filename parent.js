@@ -13,11 +13,29 @@
   const $ = (id) => document.getElementById(id);
 
   const LOCAL_KEY = 'kgHomeworkStaticStoreV1';
-  function localSummary(studentId, pin){
+  async function verifyLocalSecret(input, stored){
+    const value = String(stored || '').trim();
+    if (!value) return false;
+    if (!value.startsWith('pbkdf2$')) return String(input || '').trim() === value;
+    try {
+      const parts = value.split('$');
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey('raw', enc.encode(String(input || '').trim()), { name: 'PBKDF2' }, false, ['deriveBits']);
+      const salt = (parts[2] || '').match(/.{1,2}/g).map((hex) => parseInt(hex, 16));
+      const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new Uint8Array(salt), iterations: Number(parts[1] || 120000) }, key, 256);
+      const hex = Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
+      return hex === parts[3];
+    } catch (error) { return false; }
+  }
+  async function localSummary(studentId, pin){
     try {
       const store = JSON.parse(localStorage.getItem(LOCAL_KEY) || '{}');
       const students = Array.isArray(store.students) ? store.students : [];
-      const student = students.find((row) => String(row.studentId || '').trim() === studentId && String(row.pin || '').trim() === pin);
+      let student = null;
+      for (const row of students) {
+        if (String(row.studentId || '').trim() !== studentId) continue;
+        if (await verifyLocalSecret(pin, row.pin)) { student = row; break; }
+      }
       if (!student) throw new Error('Student ID or PIN is not correct');
       const rows = (Array.isArray(store.submissions) ? store.submissions : []).filter((row) => String(row.studentId || '').trim() === studentId).sort((a,b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
       const percents = rows.map((row) => Number(row.percent || 0) || 0);
@@ -48,7 +66,7 @@
         data = await res.json().catch(() => ({ ok:false, error:'Could not load dashboard.' }));
         if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load dashboard.');
       } catch (error) {
-        data = localSummary(studentId, pin);
+        data = await localSummary(studentId, pin);
         if (!data.ok) throw new Error(data.error || 'Could not load dashboard.');
       }
 

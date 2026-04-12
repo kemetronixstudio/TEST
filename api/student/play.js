@@ -1,4 +1,4 @@
-const { applyCors } = require('../../lib/api-security');
+const { applyCors, readJsonBody } = require('../../lib/api-security');
 const backend = require('../../lib/student-cloud-backend');
 const accessBackend = require('../../lib/access-accounts-backend');
 
@@ -47,7 +47,7 @@ module.exports = withCors(async function handler(req, res) {
       res.end(JSON.stringify({ ok: false, error: 'Method not allowed' }));
       return;
     }
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const body = readJsonBody(req);
     if (action === 'reset') {
       const auth = await accessBackend.requireAdmin(req);
       if (!auth.ok) {

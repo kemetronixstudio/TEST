@@ -1,4 +1,4 @@
-const CACHE = 'kg-english-v-clean-audit-2';
+const CACHE = 'kg-english-v-clean-audit-3';
 const ASSETS = [
   "./index.html",
   "./kg1.html",
@@ -153,7 +153,20 @@ const ASSETS = [
 ];
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).catch(() => {}));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    const results = await Promise.allSettled(ASSETS.map(async (asset) => {
+      try {
+        await cache.add(asset);
+        return { asset, ok:true };
+      } catch (error) {
+        console.warn('[sw] Failed to cache asset:', asset, error && error.message ? error.message : error);
+        return { asset, ok:false };
+      }
+    }));
+    const failed = results.filter((row) => row.status === 'fulfilled' && row.value && row.value.ok === false);
+    if (failed.length) console.warn('[sw] Some assets were not cached during install:', failed.map((row) => row.value.asset));
+  })());
 });
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))));

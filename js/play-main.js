@@ -96,14 +96,17 @@ function getSelectedGameMode(){
 /* ---- BEGIN play-test.js ---- */
 
 function resolvePlayQuestionImage(image){
-  if (typeof normalizeQuestionImage === 'function') return normalizeQuestionImage(image);
   const value = String(image || '').trim();
   if (!value) return '';
   if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('/')) return value;
   const clean = value.replace(/^\.\//, '').replace(/^\/+/, '');
-  if (/^(assets\/|svg\/|img\/|icons\/|quiz-bulk\/)/i.test(clean)) return '/' + clean;
+  if (/^assets\//i.test(clean)) return '/' + clean;
+  if (/^svg\//i.test(clean)) return '/' + clean;
+  if (/^(quiz-bulk|img|icons)\//i.test(clean)) return '/assets/' + clean;
+  if (/^[^\/]+\.(png|jpe?g|gif|webp|svg)$/i.test(clean)) return '/assets/quiz-bulk/' + clean;
   return '/assets/' + clean;
 }
+
 
 (function(){
   const API = '/api/student/play';

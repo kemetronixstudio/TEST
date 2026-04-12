@@ -6,7 +6,8 @@
   let state = null;
   let timer = null;
   let availableRows = [];
-  const isLocalPreview = /^file:$/i.test(String(location.protocol || '')) || /^(localhost|127\.0\.0\.1)$/i.test(String(location.hostname || ''));
+  const localHost = String(location.hostname || '').trim().toLowerCase();
+  const isLocalPreview = /^file:$/i.test(String(location.protocol || '')) || /^(localhost|127\.0\.0\.1|::1)$/i.test(localHost) || localHost.endsWith('.local') || localHost.endsWith('.test') || localHost.endsWith('.localhost');
   const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
   const LOCAL_KEY = 'kgHomeworkStaticStoreV1';
@@ -27,15 +28,17 @@
       const saved = localStorage.getItem(LOCAL_KEY);
       if (saved) return ensureStoreShape(JSON.parse(saved));
     } catch (error) {}
-    try {
-      const res = await fetch('data/homework.json', { cache:'no-store' });
-      const data = await res.json();
-      const safe = ensureStoreShape(data);
-      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(safe)); } catch (error) {}
-      return safe;
-    } catch (error) {
-      return ensureStoreShape(null);
+    if (isLocalPreview) {
+      try {
+        const res = await fetch('data/homework.json', { cache:'no-store' });
+        if (!res.ok) throw new Error('Preview data is unavailable.');
+        const data = await res.json();
+        const safe = ensureStoreShape(data);
+        try { localStorage.setItem(LOCAL_KEY, JSON.stringify(safe)); } catch (error) {}
+        return safe;
+      } catch (error) {}
     }
+    return ensureStoreShape(null);
   }
   function writeLocalStore(store){
     const safe = ensureStoreShape(store);
@@ -219,7 +222,11 @@
     if (!note || !card) return;
     const show = !!force || isLocalPreview;
     note.classList.toggle('hidden', !show);
-    card.classList.toggle('hidden', !show);
+    if (toggle) toggle.classList.toggle('hidden', !show);
+    if (!show) {
+      card.classList.add('hidden');
+      card.dataset.expanded = '0';
+    }
     if (toggle && !toggle.dataset.boundLocalRegister) {
       toggle.dataset.boundLocalRegister = '1';
       toggle.addEventListener('click', function(){
@@ -227,6 +234,7 @@
         const expanded = card.dataset.expanded === '1';
         card.dataset.expanded = expanded ? '0' : '1';
         if (createBtn) createBtn.classList.toggle('hidden', expanded);
+        card.classList.toggle('hidden', expanded);
         toggle.textContent = expanded ? 'Show Local Registration' : 'Hide Local Registration';
       });
     }
@@ -348,15 +356,15 @@
   }
 
   function resolveQuestionImage(image){
-    if (typeof normalizeQuestionImage === 'function') return normalizeQuestionImage(image);
     const value = String(image || '').trim();
     if (!value) return '';
     if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('/')) return value;
 
     const clean = value.replace(/^\.\//, '').replace(/^\/+/, '');
     if (/^assets\//i.test(clean)) return '/' + clean;
-    if (/^(quiz-bulk|svg|img|icons)\//i.test(clean)) return '/assets/' + clean;
-    if (/^[^\/]+\.[a-z0-9]+$/i.test(clean)) return '/assets/quiz-bulk/' + clean;
+    if (/^svg\//i.test(clean)) return '/' + clean;
+    if (/^(quiz-bulk|img|icons)\//i.test(clean)) return '/assets/' + clean;
+    if (/^[^\/]+\.(png|jpe?g|gif|webp|svg)$/i.test(clean)) return '/assets/quiz-bulk/' + clean;
 
     return '/assets/' + clean;
   }
@@ -535,7 +543,7 @@
     }
   }
 
-  updateLocalModeUi(isLocalPreview);
+  updateLocalModeUi(false);
   $('loadHomeworkBtn')?.addEventListener('click', renderAssignments);
   $('createHomeworkStudentBtn')?.addEventListener('click', createLocalStudent);
   $('homeworkNextBtn')?.addEventListener('click', nextQuestion);

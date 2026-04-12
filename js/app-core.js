@@ -4398,7 +4398,7 @@ document.addEventListener('click', function(e){
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once:true });
   else ready();
-  window.addEventListener('load', ready, { once:true });
+  if (!(document.body && document.body.dataset && document.body.dataset.page === 'admin')) window.addEventListener('load', ready, { once:true });
 })();
 /* ---- END final-stability-patch.js ---- */
 

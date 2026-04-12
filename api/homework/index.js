@@ -101,10 +101,10 @@ module.exports = withCors(async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
+      const auth = await access.requireAuthorized(req, 'teacherTest');
+      if (!auth.ok) { res.statusCode = auth.status; res.end(JSON.stringify({ ok:false, error:auth.error })); return; }
+      setAuthCookie(req, res, auth.token);
       if (action === 'delete-student') {
-        const auth = await access.requireAuthorized(req, 'teacherTest');
-        if (!auth.ok) { res.statusCode = auth.status; res.end(JSON.stringify({ ok:false, error:auth.error })); return; }
-        setAuthCookie(req, res, auth.token);
         const data = await backend.deleteStudent({ id: body.id || body.studentId || url.searchParams.get('id') || '' });
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }

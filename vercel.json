@@ -8,19 +8,6 @@
   },
   "headers": [
     {
-      "source": "/data/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        },
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow"
-        }
-      ]
-    },
-    {
       "source": "/README_FIXED.md",
       "headers": [
         {
@@ -37,6 +24,11 @@
   "redirects": [
     {
       "source": "/data/(.*)",
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/README_FIXED.md",
       "destination": "/404",
       "permanent": false
     }
