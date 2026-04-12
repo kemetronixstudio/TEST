@@ -170,7 +170,7 @@ function resolvePlayQuestionImage(image){
   };
   const STAGE_LABELS = { starter:{en:'Starter',ar:'مبتدئ'}, explorer:{en:'Explorer',ar:'مستكشف'}, champion:{en:'Champion',ar:'بطل'} };
   const STAGE_POOL_SIZE = { starter:120, explorer:150, champion:180 };
-  let state = null, timerId = null, soundEnabled = true, autoNextEnabled = true, answerLock = false, autoNextTimer = null, playDeadlineTs = 0, timerVersion = 0, questionRenderToken = 0;
+  let state = null, timerId = null, soundEnabled = true, autoNextEnabled = true, answerLock = false, autoNextTimer = null, playDeadlineTs = 0, timerVersion = 0, questionRenderToken = 0, lastTimerPersistAt = 0;
 
   function $(id){ return document.getElementById(id); }
   function getLang(){ return window.kgGetLang ? window.kgGetLang() : (localStorage.getItem('kgAppLang') || 'en'); }
@@ -290,6 +290,19 @@ function resolvePlayQuestionImage(image){
   }
   async function loadLeaderboard(){ const data = await request('?action=leaderboard'); renderLeaderboard(data); return data; }
   function selectedTotalSeconds(){ const mins = Number($('totalTimerMinutesInline')?.value || 10) || 10; return Math.max(60, mins * 60); }
+  function buildProgressState(){
+    return { currentIndex:state.currentIndex, score:state.score, answers:state.answers, questions:state.questions.map(questionPayload), startedAt:state.startedAt, updatedAt:state.updatedAt, completed:false, stage:state.stage, stageLabel:getStageLabel(state.stage), mode:state.mode, timeLeft:state.timeLeft, totalTimeLeft:state.totalTimeLeft, totalSeconds:state.totalSeconds || QUESTION_SECONDS };
+  }
+  function persistTimerState(remote){
+    if (!state || state.completed) return Promise.resolve();
+    state.updatedAt = new Date().toISOString();
+    saveLocal();
+    if (!remote) return Promise.resolve();
+    const now = Date.now();
+    if (now - lastTimerPersistAt < 3500) return Promise.resolve();
+    lastTimerPersistAt = now;
+    return request('?action=save-progress', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ identity:state.identity, sessionId:state.sessionId, state:buildProgressState() }) }).catch(()=>{});
+  }
   function stopTimer(){ timerVersion += 1; if (timerId) { clearInterval(timerId); timerId = null; } if (autoNextTimer) { clearTimeout(autoNextTimer); autoNextTimer = null; } playDeadlineTs = 0; }
   function startTimer(){
     stopTimer();
@@ -306,6 +319,7 @@ function resolvePlayQuestionImage(image){
         if (!state) return stopTimer();
         state.totalTimeLeft = Math.max(0, Number(state.totalTimeLeft || 0) - 1);
         updateBadges();
+        persistTimerState(true);
         if (state.totalTimeLeft <= 0) {
           stopTimer();
           finishQuiz(true, false).catch(()=>{});
@@ -322,11 +336,21 @@ function resolvePlayQuestionImage(image){
     timerId = setInterval(async function(){
       if (!state || version !== timerVersion || renderToken !== questionRenderToken) return stopTimer();
       const remaining = Math.max(0, Math.floor((playDeadlineTs - Date.now() + 999) / 1000));
-      if (remaining !== state.timeLeft) { state.timeLeft = remaining; updateBadges(); }
+      if (remaining !== state.timeLeft) {
+        state.timeLeft = remaining;
+        updateBadges();
+        persistTimerState(true);
+      }
       if (remaining <= 0) { stopTimer(); await finishQuiz(true, false); }
     }, 200);
   }
-  async function saveProgress(){ if (!state) return; state.updatedAt = new Date().toISOString(); saveLocal(); await request('?action=save-progress', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ identity:state.identity, sessionId:state.sessionId, state:{ currentIndex:state.currentIndex, score:state.score, answers:state.answers, questions:state.questions.map(questionPayload), startedAt:state.startedAt, updatedAt:state.updatedAt, completed:false, stage:state.stage, stageLabel:getStageLabel(state.stage), mode:state.mode, timeLeft:state.timeLeft, totalTimeLeft:state.totalTimeLeft, totalSeconds:state.totalSeconds || QUESTION_SECONDS } }) }); }
+  async function saveProgress(){
+    if (!state) return;
+    state.updatedAt = new Date().toISOString();
+    saveLocal();
+    lastTimerPersistAt = Date.now();
+    await request('?action=save-progress', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ identity:state.identity, sessionId:state.sessionId, state:buildProgressState() }) });
+  }
   function markAnsweredUi(option, correct){ const q = state.questions[state.currentIndex]; [...document.querySelectorAll('#playOptions .play-option-btn')].forEach(btn => { const idx = Number(btn.dataset.optionIndex || 0); const opt = q.options[idx]; btn.disabled = true; if (opt === q.answer) btn.classList.add('correct'); if (opt === option && !correct) btn.classList.add('wrong'); }); $('playNextBtn').disabled = false; }
   async function chooseAnswer(option){ if (!state || answerLock) return; const q = state.questions[state.currentIndex]; if (!q) return; if (state.answers.find(a => a.index === state.currentIndex)) return; answerLock = true; stopTimer(); const correct = option === q.answer; state.answers.push({ index:state.currentIndex, questionText:q.text, chosen:option, correct, expected:q.answer, answeredAt:new Date().toISOString(), difficulty:q.difficulty || 1 }); if (correct) { state.score += 1; playCorrect(); } else { playWrong(); }
     markAnsweredUi(option, correct); updateBadges(); saveProgress().catch(()=>{});
@@ -352,7 +376,43 @@ function resolvePlayQuestionImage(image){
   function nextQuestion(){ if (!state) return; if (!state.answers.find(a => a.index === state.currentIndex)) return; stopTimer(); state.currentIndex += 1; if (state.mode === 'question_timer') state.timeLeft = QUESTION_SECONDS; saveProgress().catch(()=>{}); renderQuestion(); }
   async function finishQuiz(timeUp, wrongStop){ if (!state || state.completed) return; state.completed = true; stopTimer(); const score = Number(state.score || 0); const badge = getBadgeMeta(score); const result = await request('?action=submit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ identity:state.identity, sessionId:state.sessionId, result:{ score, total:state.answers.length, percent: state.answers.length ? Math.round((score / Math.max(1, state.answers.length)) * 100) : 0, answers:state.answers, questionCount:state.answers.length, completedAt:new Date().toISOString(), quizLevel:'Play & Test', stage:state.stage, stageLabel:getStageLabel(state.stage), badgeTitle:badge.title, mode: state.mode }, progress:{ completed:true, currentIndex:state.currentIndex, questions:state.questions.map(questionPayload), mode: state.mode, timeLeft: state.timeLeft, totalTimeLeft: state.totalTimeLeft, totalSeconds: state.totalSeconds } }) }); playFinish(); $('playResultMedal').textContent = badge.medal; $('playResultBadge').textContent = badge.title; $('playResultBadge').className = 'play-result-badge ' + badge.cls; $('playResultScore').textContent = String(score); $('playResultText').textContent = timeUp ? tr('playTimeOverResult',{score}) : wrongStop ? tr('playWrongResult',{score}) : tr('playGreatResult',{score}); saveLocal(); showSection('playResultCard'); if (result && result.leaderboard) renderLeaderboard(result.leaderboard); else loadLeaderboard().catch(()=>{}); }
   window.__playChooseAnswer = function(index){ if (!state) return; const q=state.questions[state.currentIndex]; const idx=Number(index||0); if (!q || Number.isNaN(idx) || idx<0 || idx>=q.options.length) return; chooseAnswer(q.options[idx]); };
-  async function startOrResume(){ try{ setStatus(tr('playPreparing')); const identity = buildIdentity(); const stage = getStageFromGrade(identity.grade); const selectedMode = getSelectedGameMode(); const selectedTotal = selectedTotalSeconds(); const local = loadLocal(); const same = local && local.identity && local.identity.name === identity.name && String(local.identity.studentId||'').trim() === identity.studentId && String(local.identity.grade||'') === identity.grade; const startData = await request('?action=start',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ identity, sessionId: same ? local.sessionId : '' }) }); if (startData.progress && Array.isArray(startData.progress.questions) && startData.progress.questions.length && !startData.progress.completed) { state = { identity:startData.identity, sessionId:startData.sessionId, questions:startData.progress.questions, currentIndex:Number(startData.progress.currentIndex||0)||0, score:Number(startData.progress.score||0)||0, answers:Array.isArray(startData.progress.answers)?startData.progress.answers:[], startedAt:startData.progress.startedAt || new Date().toISOString(), completed:false, stage:startData.progress.stage||stage, mode:startData.progress.mode || selectedMode || 'question_timer', timeLeft:Number(startData.progress.timeLeft||QUESTION_SECONDS)||QUESTION_SECONDS, totalTimeLeft:Number(startData.progress.totalTimeLeft||startData.progress.totalSeconds||selectedTotal)||selectedTotal, totalSeconds:Number(startData.progress.totalSeconds||selectedTotal)||selectedTotal, _resumeIndex:Number(startData.progress.currentIndex||0)||0 }; setStatus(tr('playResuming')); } else { const questions = (window.PlayQuestionBank && window.PlayQuestionBank.createMixedQuiz) ? window.PlayQuestionBank.createMixedQuiz(STAGE_POOL_SIZE[stage], stage, identity.grade) : []; if (!questions || !questions.length) { setStatus(tr('playNoQuestions') || 'No questions available right now.'); return; } state = { identity:startData.identity, sessionId:startData.sessionId, questions, currentIndex:0, score:0, answers:[], startedAt:new Date().toISOString(), completed:false, stage, mode:selectedMode, timeLeft:QUESTION_SECONDS, totalTimeLeft:selectedTotal, totalSeconds:selectedTotal, _resumeIndex:null }; await saveProgress(); setStatus(tr('playReady')); } renderQuestion(); updateAutoNextToggle(); } catch(error){ setStatus(error.message || 'Could not start the quiz.'); } }
+  async function startOrResume(){
+    try{
+      setStatus(tr('playPreparing'));
+      const identity = buildIdentity();
+      const stage = getStageFromGrade(identity.grade);
+      const selectedMode = getSelectedGameMode();
+      const selectedTotal = selectedTotalSeconds();
+      const local = loadLocal();
+      const same = local && local.identity && local.identity.name === identity.name && String(local.identity.studentId||'').trim() === identity.studentId && String(local.identity.grade||'') === identity.grade;
+      const startData = await request('?action=start',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ identity, sessionId: same ? local.sessionId : '' }) });
+      if (startData.progress && Array.isArray(startData.progress.questions) && startData.progress.questions.length && !startData.progress.completed) {
+        const progress = startData.progress || {};
+        const mode = progress.mode || selectedMode || 'question_timer';
+        const savedAt = Date.parse(progress.updatedAt || progress.startedAt || '');
+        const elapsed = Number.isFinite(savedAt) ? Math.max(0, Math.floor((Date.now() - savedAt) / 1000)) : 0;
+        let timeLeft = Number.isFinite(Number(progress.timeLeft)) ? Math.max(0, Math.floor(Number(progress.timeLeft))) : QUESTION_SECONDS;
+        let totalTimeLeft = Number.isFinite(Number(progress.totalTimeLeft)) ? Math.max(0, Math.floor(Number(progress.totalTimeLeft))) : (Number.isFinite(Number(progress.totalSeconds)) ? Math.max(0, Math.floor(Number(progress.totalSeconds))) : selectedTotal);
+        const totalSeconds = Number.isFinite(Number(progress.totalSeconds)) ? Math.max(60, Math.floor(Number(progress.totalSeconds))) : selectedTotal;
+        if (mode === 'question_timer') timeLeft = Math.max(0, timeLeft - elapsed);
+        if (mode === 'total_timer') totalTimeLeft = Math.max(0, totalTimeLeft - elapsed);
+        state = { identity:startData.identity, sessionId:startData.sessionId, questions:progress.questions, currentIndex:Number(progress.currentIndex||0)||0, score:Number(progress.score||0)||0, answers:Array.isArray(progress.answers)?progress.answers:[], startedAt:progress.startedAt || new Date().toISOString(), completed:false, stage:progress.stage||stage, mode:mode, timeLeft:timeLeft, totalTimeLeft:totalTimeLeft, totalSeconds:totalSeconds, _resumeIndex:Number(progress.currentIndex||0)||0 };
+        setStatus(tr('playResuming'));
+        if ((state.mode === 'question_timer' && state.timeLeft <= 0) || (state.mode === 'total_timer' && state.totalTimeLeft <= 0)) {
+          await finishQuiz(true, false);
+          return;
+        }
+      } else {
+        const questions = (window.PlayQuestionBank && window.PlayQuestionBank.createMixedQuiz) ? window.PlayQuestionBank.createMixedQuiz(STAGE_POOL_SIZE[stage], stage, identity.grade) : [];
+        if (!questions || !questions.length) { setStatus(tr('playNoQuestions') || 'No questions available right now.'); return; }
+        state = { identity:startData.identity, sessionId:startData.sessionId, questions, currentIndex:0, score:0, answers:[], startedAt:new Date().toISOString(), completed:false, stage, mode:selectedMode, timeLeft:QUESTION_SECONDS, totalTimeLeft:selectedTotal, totalSeconds:selectedTotal, _resumeIndex:null };
+        await saveProgress();
+        setStatus(tr('playReady'));
+      }
+      renderQuestion();
+      updateAutoNextToggle();
+    } catch(error){ setStatus(error.message || 'Could not start the quiz.'); }
+  }
   function wireOptionFallbacks(){ const wrap = $('playOptions'); if (!wrap) return; const handler = function(event){ const btn = event.target && event.target.closest ? event.target.closest('.play-option-btn') : null; if (!btn || btn.disabled || answerLock) return; event.preventDefault(); event.stopPropagation(); const index = Number(btn.dataset.optionIndex || 0); if (!Number.isNaN(index)) window.__playChooseAnswer(index); }; wrap.addEventListener('click', handler, true); wrap.addEventListener('pointerup', handler, true); wrap.addEventListener('touchend', handler, true); }
   function init(){ if (document.body.dataset.page !== 'playtest') return; soundEnabled = loadSoundSetting(); autoNextEnabled = loadAutoNextSetting(); window.applyPlayTranslations = applyPlayTranslations;
 applyPlayTranslations(); wireOptionFallbacks(); document.querySelectorAll('input[name="gameModeCards"]').forEach((radio) => radio.addEventListener('change', function(){ const wrap = $('totalTimerInlineWrap'); if (wrap) wrap.hidden = this.value !== 'total_timer'; document.querySelectorAll('#gameModeCardsWrap .mode-card').forEach((card) => card.classList.toggle('active', card.getAttribute('data-mode-value') === getSelectedGameMode())); })); if ($('totalTimerInlineWrap')) $('totalTimerInlineWrap').hidden = getSelectedGameMode() !== 'total_timer'; loadLeaderboard().catch(error => setStatus(error.message || tr('playNoLeaderboard'))); $('playStartBtn')?.addEventListener('click', startOrResume); $('playNextBtn')?.addEventListener('click', nextQuestion); $('playAgainBtn')?.addEventListener('click', function(){ if ($('playStudentName') && state && state.identity) $('playStudentName').value = state.identity.name || ''; if ($('playStudentId') && state && state.identity) $('playStudentId').value = state.identity.studentId || ''; if ($('playStudentGrade') && state && state.identity) $('playStudentGrade').value = state.identity.grade || 'KG1'; clearLocal(); stopTimer(); answerLock = false; state = null; showSection('playStartCard'); setStatus(tr('playReady')); loadLeaderboard().catch(()=>{}); }); $('refreshPlayLeadersBtn')?.addEventListener('click', ()=> loadLeaderboard().catch(()=>{})); $('playSoundToggleBtn')?.addEventListener('click', ()=>{ soundEnabled=!soundEnabled; saveSoundSetting(); updateSoundButton(); }); $('playAutoNextToggle')?.addEventListener('change', function(){ autoNextEnabled=!!this.checked; saveAutoNextSetting(); updateAutoNextToggle(); }); window.kgPlayHandleLangChange = function(){ applyPlayTranslations(); if (state) { renderQuestion(); } loadLeaderboard().catch(()=>{}); } }
