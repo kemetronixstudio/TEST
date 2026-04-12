@@ -4636,6 +4636,7 @@ document.addEventListener('click', function(e){
       event.preventDefault();
       if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     }
+    if (typeof window.__kgBackendAccessLogin === 'function') return window.__kgBackendAccessLogin(event);
     if (typeof window.__kgStableAdminLogin === 'function') return window.__kgStableAdminLogin(event);
   }
 
@@ -4699,10 +4700,6 @@ document.addEventListener('click', function(e){
   try { window.renderStoredQuestions = finalRenderStoredQuestions; } catch (error) {}
 
   onReady(function(){
-    bindAuthoritativeAdminLogin();
-    ensureClassQuestionsReady();
-  });
-  window.addEventListener('load', function(){
     bindAuthoritativeAdminLogin();
     ensureClassQuestionsReady();
   });

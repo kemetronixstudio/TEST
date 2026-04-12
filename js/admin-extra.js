@@ -518,13 +518,10 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
     }
   }
 
+  window.__kgBackendAccessLogin = handleLogin;
+
   async function restoreBackendSession(){
     const token = readToken();
-    if (!token) {
-      clearStaleFrontendSession();
-      forceLoginView();
-      return false;
-    }
     try {
       const payload = await api('?action=me', { method: 'GET' });
       persistSession(payload.account, payload.token || token);
@@ -543,13 +540,6 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
     if (document.documentElement.dataset.backendAccessCaptureBound === '1') return;
     document.documentElement.dataset.backendAccessCaptureBound = '1';
     document.addEventListener('click', function(event){
-      const loginBtn = event.target && event.target.closest ? event.target.closest('#adminLoginBtn') : null;
-      if (loginBtn) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        handleLogin(event);
-        return;
-      }
       const saveBtn = event.target && event.target.closest ? event.target.closest('#saveAccessAccountBtn') : null;
       if (saveBtn) {
         event.preventDefault();
@@ -576,9 +566,6 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
 
   function bind(){
     forceLoginView();
-    const loginBtn = cloneButton('adminLoginBtn');
-    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
-
     const saveBtn = cloneButton('saveAccessAccountBtn');
     if (saveBtn) saveBtn.addEventListener('click', function(event){
       event.preventDefault();
