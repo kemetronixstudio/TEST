@@ -43,6 +43,8 @@ Then open:
 - Vercel config is valid for Node serverless functions.
 - Node is pinned to `20.x` in `package.json`.
 - For production, set `ACCESS_ACCOUNTS_SESSION_SECRET` and `ALLOWED_ORIGINS`.
+- For durable rate limiting on Vercel, configure KV/Upstash. Without KV, fallback throttling is runtime-local only and can reset across cold starts.
+- Example `ALLOWED_ORIGINS`: `https://your-project.vercel.app,https://your-custom-domain.com`.
 
 
 Additional notes in this build:
