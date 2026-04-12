@@ -762,7 +762,14 @@ function normalizeQuestionId(text){ return (text || "").toLowerCase().replace(/[
 function questionId(grade, q, idx, source){ return `${grade}-${source}-${idx}-${normalizeQuestionId(q.text)}`; }
 function collectQuestionsWithMeta(grade){
   const custom = getCustomQuestions();
-  const base = (baseQuestionPools[grade] || []).map((q,idx)=> ({...q, _meta:{id:questionId(grade,q,idx,'base'), grade, idx, source:'base'}}));
+  const sig = (q) => [q && q.grade || grade || '', q && q.skill || '', q && q.text || '', q && q.answer || '', q && q.image || ''].join('||').trim().toLowerCase();
+  const baseRows = Array.isArray(baseQuestionPools[grade]) ? baseQuestionPools[grade].slice() : [];
+  try {
+    const bulkRows = (typeof QUIZ_BULK_PACKAGE !== 'undefined' && Array.isArray(QUIZ_BULK_PACKAGE[grade])) ? QUIZ_BULK_PACKAGE[grade] : [];
+    const seen = new Set(baseRows.map(sig));
+    bulkRows.forEach((q) => { const key = sig(q); if (!seen.has(key)) { seen.add(key); baseRows.push(q); } });
+  } catch (error) {}
+  const base = baseRows.map((q,idx)=> ({...q, _meta:{id:questionId(grade,q,idx,'base'), grade, idx, source:'base'}}));
   const extra = (custom[grade] || []).map((q,idx)=> ({...q, _meta:{id:questionId(grade,q,idx,'custom'), grade, idx, source:'custom'}}));
   return [...base, ...extra];
 }
@@ -945,7 +952,10 @@ function adaptiveQuestionSet(pool, count, studentName='', grade=''){
   return result;
 }
 function initQuiz(){
-  const grade = document.body.dataset.grade; if (!grade) return; const setupCard = $('#setupCard'); const studentNameInput = $('#studentName'); const goBtn = $('#goToLevelBtn'); const levelChooser = $('#levelChooser'); applyLevelVisibilityUI(grade); const levelBtns = [...levelChooser.querySelectorAll('.level-btn[data-count]')].filter(btn => !btn.classList.contains('hidden'));
+  const grade = String(document.body && document.body.dataset && document.body.dataset.grade || '').trim().toLowerCase(); if (!grade) return;
+  const initGuardKey = '__quizInitDone:' + grade;
+  if (document.body && document.body.dataset && document.body.dataset.quizInitGuard === initGuardKey) return;
+  if (document.body && document.body.dataset) document.body.dataset.quizInitGuard = initGuardKey; const setupCard = $('#setupCard'); const studentNameInput = $('#studentName'); const goBtn = $('#goToLevelBtn'); const levelChooser = $('#levelChooser'); applyLevelVisibilityUI(grade); const levelBtns = [...levelChooser.querySelectorAll('.level-btn[data-count]')].filter(btn => !btn.classList.contains('hidden'));
   const quizSection = $('#quizSection'); const studentPreview = $('#studentPreview'); const quizLevelLabel = $('#quizLevelLabel'); const questionProgressEl = $('#questionProgress'); const timerValueEl = $('#timerValue'); const scoreValueEl = $('#scoreValue'); const skillBadge = $('#skillBadge'); const typeBadge = $('#questionTypeBadge'); const questionText = $('#questionText'); const questionImageWrap = $('#questionImageWrap'); const questionImage = $('#questionImage'); const optionsWrap = $('#optionsWrap'); const nextBtn = $('#nextBtn'); const autoNext = $('#autoNextToggle'); const voiceBtn = $('#voiceBtn'); const testLaunchWrap = $('#testLaunchWrap'); const startAssignedTestBtn = $('#startAssignedTestBtn');
   let selectedCount = 10, selectedLevelLabel = translations[getLang()].level1, studentName = '', questions = [], currentIndex = 0, score = 0, timer = 15, interval = null, autoAdvanceTimeout = null, answered = false, skillStats = {}, missedQuestions=[], adaptiveIndex = 0, sessionUsed = new Set(), activeTestConfig = null, quizDeadlineTs = 0;
   let studentProfile = null, currentQuizKey = '', answerLog = [], quizStartedAt = '';
@@ -1005,6 +1015,7 @@ function initQuiz(){
         workingPool = pool.filter(q => wanted.has(String(q.text).trim().toLowerCase()));
       }
     }
+    const studentCloud = getStudentCloudClient();
     currentQuizKey = studentCloud && typeof studentCloud.buildQuizKey === 'function'
       ? studentCloud.buildQuizKey({ grade: grade.toUpperCase(), count: selectedCount, label: selectedLevelLabel, testName: activeTestConfig && activeTestConfig.name })
       : `${grade.toUpperCase()}|${selectedCount}|${selectedLevelLabel}`;
@@ -1029,7 +1040,7 @@ function initQuiz(){
           adaptiveIndex = 0;
           quizStartedAt = remote.progress.startedAt || new Date().toISOString();
           questions.forEach(q=> ensureSkillStat(q.skill, q.text));
-          timer = grade === 'kg1' ? 15 : 18; unlockSpeech(); setupCard.classList.add('hidden'); quizSection.classList.remove('hidden'); studentPreview.textContent = studentName; quizLevelLabel.textContent = `${selectedLevelLabel} / ${selectedCount}`; scoreValueEl.textContent = String(score); try { renderQuestion(); } catch (e) { console.error('renderQuestion failed on startQuiz resume', e); finishQuiz(); }
+          timer = (typeof window.__kgGradeTimerSeconds === 'function' ? window.__kgGradeTimerSeconds(grade) : (grade === 'kg1' ? 15 : 18)); unlockSpeech(); setupCard.classList.add('hidden'); quizSection.classList.remove('hidden'); studentPreview.textContent = studentName; quizLevelLabel.textContent = `${selectedLevelLabel} / ${selectedCount}`; scoreValueEl.textContent = String(score); try { renderQuestion(); } catch (e) { console.error('renderQuestion failed on startQuiz resume', e); finishQuiz(); }
           return;
         }
       } catch (error) { console.warn('cloud start failed', error); }
@@ -1037,7 +1048,7 @@ function initQuiz(){
     const safeCount = Math.min(selectedCount, workingPool.length || selectedCount);
     let baseSet = adaptiveQuestionSet(workingPool, safeCount, studentName, grade);
     if (!baseSet.length){ alert('No valid questions available for this selection.'); return; }
-    selectedCount = baseSet.length; questions = baseSet; sessionUsed = new Set(baseSet.map(questionSignature)); currentIndex = 0; score = 0; missedQuestions = []; skillStats = {}; adaptiveIndex = 0; answerLog = []; quizStartedAt = new Date().toISOString(); questions.forEach(q=> ensureSkillStat(q.skill, q.text)); timer = grade === 'kg1' ? 15 : 18; unlockSpeech(); setupCard.classList.add('hidden'); quizSection.classList.remove('hidden'); studentPreview.textContent = studentName; quizLevelLabel.textContent = `${selectedLevelLabel} / ${selectedCount}`; scoreValueEl.textContent = '0'; await pushCloudProgress(); try { renderQuestion(); } catch (e) { console.error('renderQuestion failed on startQuiz', e); finishQuiz(); }
+    selectedCount = baseSet.length; questions = baseSet; sessionUsed = new Set(baseSet.map(questionSignature)); currentIndex = 0; score = 0; missedQuestions = []; skillStats = {}; adaptiveIndex = 0; answerLog = []; quizStartedAt = new Date().toISOString(); questions.forEach(q=> ensureSkillStat(q.skill, q.text)); timer = (typeof window.__kgGradeTimerSeconds === 'function' ? window.__kgGradeTimerSeconds(grade) : (grade === 'kg1' ? 15 : 18)); unlockSpeech(); setupCard.classList.add('hidden'); quizSection.classList.remove('hidden'); studentPreview.textContent = studentName; quizLevelLabel.textContent = `${selectedLevelLabel} / ${selectedCount}`; scoreValueEl.textContent = '0'; await pushCloudProgress(); try { renderQuestion(); } catch (e) { console.error('renderQuestion failed on startQuiz', e); finishQuiz(); }
   }
   function current(){ return questions[currentIndex]; }
   var quizTimerToken = 0;
@@ -1046,7 +1057,7 @@ function initQuiz(){
 // =====================
 
 function renderQuestion(){
-    clearQuizTimers(); const timerToken = quizTimerToken; answered = false; nextBtn.classList.add('hidden'); const q = current(); if (!q) { finishQuiz(); return; } ensureSkillStat(q.skill, q.text); if (questionProgressEl) questionProgressEl.textContent = `${currentIndex+1} / ${questions.length}`; skillBadge.textContent = skillLabels[getLang()][q.skill] || q.skill; typeBadge.textContent = typeLabels[getLang()][q.type] || q.type; questionText.textContent = q.text; const resolvedImage = normalizeQuestionImage(q.image || inferLegacyPictureImage(q), q.grade || grade, q.text); if (resolvedImage){ q.image = resolvedImage; loadQuestionImage(resolvedImage, q.text); } else { questionImageWrap.classList.add('hidden'); questionImage.removeAttribute('src'); questionImage.onerror = null; } optionsWrap.innerHTML = ''; const timerEnabled = timerEnabledFor(grade); timer = grade === 'kg1' ? 15 : 18; quizDeadlineTs = timerEnabled ? (Date.now() + (timer * 1000)) : 0; timerValueEl.textContent = timerEnabled ? String(timer) : '∞'; timerValueEl.closest('.status-card')?.classList.toggle('timer-disabled', !timerEnabled); shuffle(q.options).forEach(opt=>{ const b=document.createElement('button'); b.className='option-btn'; b.textContent = opt; b.onclick = ()=> answerQuestion(b, opt === q.answer, opt); optionsWrap.appendChild(b); }); if (timerEnabled) { interval = setInterval(()=>{ try { if (timerToken !== quizTimerToken || current() !== q) { clearQuizTimers(); return; } const remaining = Math.max(0, Math.ceil((quizDeadlineTs - Date.now()) / 1000)); if (remaining !== timer) { timer = remaining; timerValueEl.textContent = String(timer); } if (remaining <= 0){ clearInterval(interval); interval = null; timeoutQuestion(); } } catch(err){ console.error('timer tick failed', err); clearQuizTimers(); finishQuiz(); } }, 250); } else { interval = null; } }
+    clearQuizTimers(); const timerToken = quizTimerToken; answered = false; nextBtn.classList.add('hidden'); const q = current(); if (!q) { finishQuiz(); return; } ensureSkillStat(q.skill, q.text); if (questionProgressEl) questionProgressEl.textContent = `${currentIndex+1} / ${questions.length}`; skillBadge.textContent = skillLabels[getLang()][q.skill] || q.skill; typeBadge.textContent = typeLabels[getLang()][q.type] || q.type; questionText.textContent = q.text; const resolvedImage = normalizeQuestionImage(q.image || inferLegacyPictureImage(q), q.grade || grade, q.text); if (resolvedImage){ q.image = resolvedImage; loadQuestionImage(resolvedImage, q.text); } else { questionImageWrap.classList.add('hidden'); questionImage.removeAttribute('src'); questionImage.onerror = null; } optionsWrap.innerHTML = ''; const timerEnabled = timerEnabledFor(grade); timer = (typeof window.__kgGradeTimerSeconds === 'function' ? window.__kgGradeTimerSeconds(grade) : (grade === 'kg1' ? 15 : 18)); quizDeadlineTs = timerEnabled ? (Date.now() + (timer * 1000)) : 0; timerValueEl.textContent = timerEnabled ? String(timer) : '∞'; timerValueEl.closest('.status-card')?.classList.toggle('timer-disabled', !timerEnabled); shuffle(q.options).forEach(opt=>{ const b=document.createElement('button'); b.className='option-btn'; b.textContent = opt; b.onclick = ()=> answerQuestion(b, opt === q.answer, opt); optionsWrap.appendChild(b); }); if (timerEnabled) { interval = setInterval(()=>{ try { if (timerToken !== quizTimerToken || current() !== q) { clearQuizTimers(); return; } const remaining = Math.max(0, Math.ceil((quizDeadlineTs - Date.now()) / 1000)); if (remaining !== timer) { timer = remaining; timerValueEl.textContent = String(timer); } if (remaining <= 0){ clearInterval(interval); interval = null; timeoutQuestion(); } } catch(err){ console.error('timer tick failed', err); clearQuizTimers(); finishQuiz(); } }, 250); } else { interval = null; } }
   function markCorrect(buttons, q){ buttons.forEach(btn=>{ if (btn.textContent === q.answer) btn.classList.add('correct'); }); }
   function schedule(){ if (autoNext.checked) { autoAdvanceTimeout = setTimeout(goNext, 900); } else nextBtn.classList.remove('hidden'); }
   function tuneDifficulty(wasCorrect, remaining){ if (wasCorrect && remaining > 10) adaptiveIndex = Math.min(adaptiveIndex + 1, 2); if (!wasCorrect || remaining < 4) adaptiveIndex = Math.max(adaptiveIndex - 1, 0); }
@@ -1058,7 +1069,7 @@ function renderQuestion(){
     tuneDifficulty(isCorrect, timer); maybeSwapFutureQuestions(); pushCloudProgress(); schedule(); } catch(err){ console.error('answerQuestion failed', err); goNext(); } }
   function timeoutQuestion(){ if (answered) return; try { answered = true; const q = current(); ensureSkillStat(q.skill, q.text); const buttons=[...document.querySelectorAll('.option-btn')]; buttons.forEach(b=> b.classList.add('disabled')); markCorrect(buttons, q); answerLog[currentIndex] = { index: currentIndex, questionText: q.text, chosen: '', correct: false, expected: q.answer, timedOut: true, answeredAt: new Date().toISOString() }; skillStats[q.skill].wrong += 1; missedQuestions.push(q.text); playTone('wrong'); tuneDifficulty(false,0); maybeSwapFutureQuestions(); pushCloudProgress(); schedule(); } catch(err){ console.error('timeoutQuestion failed', err); goNext(); } }
   function goNext(){ clearQuizTimers(); if (!questions.length) return; currentIndex += 1; if (currentIndex >= questions.length) finishQuiz(); else { pushCloudProgress(); try { renderQuestion(); } catch (e) { console.error('renderQuestion failed on goNext', e); try { currentIndex += 1; if (currentIndex >= questions.length) finishQuiz(); else renderQuestion(); } catch(e2){ console.error('second render attempt failed', e2); finishQuiz(); } } } }
-  async function finishQuiz(){ clearQuizTimers(); playTone('finish'); const max = questions.length * (timerEnabledFor(grade) ? (10 + (grade === 'kg1' ? 15 : 18)) : 10); const percent = Math.round((score/max)*100); const weaknessEntries = Object.entries(skillStats).map(([skill, st])=>({skill, wrong:st.wrong, right:st.right})).sort((a,b)=> b.wrong - a.wrong); const strengthEntries = Object.entries(skillStats).map(([skill, st])=>({skill, wrong:st.wrong, right:st.right})).sort((a,b)=> b.right - a.right); const weaknesses = weaknessEntries.filter(x=>x.wrong>0).slice(0,2).map(x=>x.skill); const strengths = strengthEntries.filter(x=>x.right>0).slice(0,2).map(x=>x.skill); const data = {studentName, studentId: studentProfile && studentProfile.studentId || '', className: studentProfile && studentProfile.className || '', isGuest: !!(studentProfile && studentProfile.isGuest), grade:grade.toUpperCase(), quizLevel:selectedLevelLabel, questionCount:selectedCount, score, percent, strengths: strengths.length ? strengths : ['Reading'], weaknesses, advice: smartAdvice(weaknesses), remark: resultRemark(percent), date: new Date().toLocaleDateString('en-GB'), lang:getLang(), missedQuestions, answers: answerLog.slice(), questions: questions.slice()}; localStorage.setItem(storeKeys.cert, JSON.stringify(data)); recordStudentAttempt(data); const studentCloud = getStudentCloudClient(); if (studentCloud && studentProfile && currentQuizKey) { try { await studentCloud.submitResult({ identity: studentProfile, quizKey: currentQuizKey, result: data, state: serializeQuizState(true) }); } catch (error) { console.warn('cloud submit failed', error); } } window.location.href = 'certificate.html'; }
+  async function finishQuiz(){ clearQuizTimers(); playTone('finish'); const max = questions.length * (timerEnabledFor(grade) ? (10 + (typeof window.__kgGradeTimerSeconds === 'function' ? window.__kgGradeTimerSeconds(grade) : (grade === 'kg1' ? 15 : 18))) : 10); const percent = Math.round((score/max)*100); const weaknessEntries = Object.entries(skillStats).map(([skill, st])=>({skill, wrong:st.wrong, right:st.right})).sort((a,b)=> b.wrong - a.wrong); const strengthEntries = Object.entries(skillStats).map(([skill, st])=>({skill, wrong:st.wrong, right:st.right})).sort((a,b)=> b.right - a.right); const weaknesses = weaknessEntries.filter(x=>x.wrong>0).slice(0,2).map(x=>x.skill); const strengths = strengthEntries.filter(x=>x.right>0).slice(0,2).map(x=>x.skill); const data = {studentName, studentId: studentProfile && studentProfile.studentId || '', className: studentProfile && studentProfile.className || '', isGuest: !!(studentProfile && studentProfile.isGuest), grade:grade.toUpperCase(), quizLevel:selectedLevelLabel, questionCount:selectedCount, score, percent, strengths: strengths.length ? strengths : ['Reading'], weaknesses, advice: smartAdvice(weaknesses), remark: resultRemark(percent), date: new Date().toLocaleDateString('en-GB'), lang:getLang(), missedQuestions, answers: answerLog.slice(), questions: questions.slice()}; localStorage.setItem(storeKeys.cert, JSON.stringify(data)); recordStudentAttempt(data); const studentCloud = getStudentCloudClient(); if (studentCloud && studentProfile && currentQuizKey) { try { await studentCloud.submitResult({ identity: studentProfile, quizKey: currentQuizKey, result: data, state: serializeQuizState(true) }); } catch (error) { console.warn('cloud submit failed', error); } } window.location.href = 'certificate.html'; }
   document.querySelectorAll('.lang-btn').forEach(btn=>btn.addEventListener('click', ()=>{ applyLevelVisibilityUI(grade); if (studentNameInput) updateHistory(); if (questions.length){ const levelMap = {10:'level1',20:'level2',30:'level3',40:'level4',50:'level5'}; selectedLevelLabel = translations[getLang()][levelMap[selectedCount] || 'level1']; quizLevelLabel.textContent = `${selectedLevelLabel} / ${selectedCount}`; skillBadge.textContent = skillLabels[getLang()][current().skill] || current().skill; typeBadge.textContent = typeLabels[getLang()][current().type] || current().type; nextBtn.textContent = translations[getLang()].nextQuestion; } }));
 }
 async function makeCertificatePdfBlob(){ const area = $('#certificateArea'); if (!area) throw new Error('Certificate area not found.'); if (typeof html2canvas === 'undefined' || !window.jspdf || !window.jspdf.jsPDF) throw new Error('PDF tools are not available right now. Please reload the page and try again.'); const canvas = await html2canvas(area, {scale:2, backgroundColor:'#fffdf4', useCORS:true}); const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf; const pdf = new jsPDF('p','pt','a4'); const pageWidth = pdf.internal.pageSize.getWidth(); const pageHeight = pdf.internal.pageSize.getHeight(); const ratio = Math.min((pageWidth-40)/canvas.width, (pageHeight-40)/canvas.height); const w = canvas.width*ratio, h = canvas.height*ratio; pdf.addImage(imgData,'PNG',(pageWidth-w)/2,20,w,h); return pdf.output('blob'); }
@@ -1067,7 +1078,7 @@ function renderCertificate(){
   $('#downloadPdfBtn')?.addEventListener('click', async ()=>{ try { const blob = await makeCertificatePdfBlob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${data.studentName}-certificate.pdf`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); } catch (error) { alert(error && error.message ? error.message : 'PDF tools are not available right now. Please reload the page and try again.'); } });
   $('#shareCertBtn')?.addEventListener('click', async ()=>{ try { const blob = await makeCertificatePdfBlob(); const file = new File([blob], `${data.studentName}-certificate.pdf`, {type:'application/pdf'}); if (navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({title:'Certificate', files:[file], text:`${data.studentName} - ${data.percent}%`}); } else { window.open(`https://wa.me/?text=${encodeURIComponent(`${data.studentName} finished ${data.grade} with ${data.percent}%`)}`,'_blank'); } } catch (error) { alert(error && error.message ? error.message : 'Sharing tools are not available right now. Please reload the page and try again.'); } });
 }
-function initAdmin(){ if (document.body.dataset.page !== 'admin') return; const loginCard = $('#adminLoginCard'); const panel = $('#adminPanel'); $('#adminLoginBtn')?.addEventListener('click', async ()=>{ const user = $('#adminUser').value.trim(); const pass = $('#adminPass').value.trim(); let account = null; if (!account && typeof window.__kgAuthenticateAdminLocal === 'function') { try { account = await window.__kgAuthenticateAdminLocal(user, pass); } catch (e) {} } if (!account) account = await tryBackendAdminLogin(user, pass); if (!account){ alert(getLang()==='ar'?'اسم المشرف أو كلمة المرور غير صحيحة.':'Wrong admin name or password.'); return; } loginCard.classList.add('hidden'); panel.classList.remove('hidden'); applySectionPermissions(account); populateDashboardDateFilter(); renderAdminDashboard(); renderLevelVisibilityEditor(); renderTimerSettingsEditor(); renderQuizAccessEditor(); renderTeacherTestEditor(); renderAccessPermissions([]); renderAccessAccountsList(); renderTeacherQuestionPicker(); wireCollapseButtons(); wireQuestionFilterButtons(); const cm=document.querySelector('[data-section-key="classManager"]'); if(cm){ cm.classList.remove('hidden'); cm.style.display=''; } }); $('#addQuestionBtn')?.addEventListener('click', addCustomQuestion); $('#showStoredQuestionsBtn')?.addEventListener('click', renderStoredQuestions); $('#saveLevelsBtn')?.addEventListener('click', saveLevelVisibilityFromAdmin); $('#resetLevelsBtn')?.addEventListener('click', resetLevelVisibilityFromAdmin); $('#saveTimerSettingsBtn')?.addEventListener('click', saveTimerSettingsFromAdmin); $('#resetTimerSettingsBtn')?.addEventListener('click', resetTimerSettingsFromAdmin); $('#dashboardDateFilter')?.addEventListener('change', renderAdminDashboard); $('#exportDataBtn')?.addEventListener('click', ()=>{ const data = {progress:getProgress(), records:getRecords(), attemptsLog:getAttemptsLog(), analytics:getAnalytics(), customQuestions:getCustomQuestions(), questionOverrides:getQuestionOverrides(), levelVisibility:getLevelVisibility()}; const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='kg-app-data.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); }); $('#exportExcelBtn')?.addEventListener('click', exportDashboardExcel); $('#exportJpegBtn')?.addEventListener('click', exportDashboardJpeg); $('#resetDashboardDataBtn')?.addEventListener('click', resetDashboardData); $('#saveQuizPasswordBtn')?.addEventListener('click', saveQuizAccessFromAdmin); $('#clearQuizPasswordBtn')?.addEventListener('click', clearQuizAccessFromAdmin); $('#saveTeacherTestBtn')?.addEventListener('click', saveTeacherTestFromAdmin); $('#clearTeacherTestBtn')?.addEventListener('click', clearTeacherTestFromAdmin); $('#downloadCurrentQuestionsExcelBtn')?.addEventListener('click', downloadCurrentQuestionsExcel); $('#bulkQuestionUpload')?.addEventListener('change', (e)=>{ const file=e.target.files?.[0]; if(file) importBulkQuestionsFromWorkbook(file); e.target.value=''; }); $('#saveAccessAccountBtn')?.addEventListener('click', saveAccessAccountFromAdmin); $('#accessAccountRole')?.addEventListener('change', ()=>renderAccessPermissions(Array.from(document.querySelectorAll('.perm-check:checked')).map(el=>el.value))); $('#toggleQuestionBankEditorBtn')?.addEventListener('click', (e)=> toggleCollapse('questionBankEditorBody', e.currentTarget)); $('#toggleStoredQuestionsBtn')?.addEventListener('click', (e)=> toggleCollapse('storedQuestionsWrap', e.currentTarget)); document.getElementById('testMode')?.addEventListener('change', ()=>{ renderTeacherQuestionPicker(); });
+function initAdmin(){ if (document.body.dataset.page !== 'admin') return; const loginCard = $('#adminLoginCard'); const panel = $('#adminPanel'); $('#addQuestionBtn')?.addEventListener('click', addCustomQuestion); $('#showStoredQuestionsBtn')?.addEventListener('click', renderStoredQuestions); $('#saveLevelsBtn')?.addEventListener('click', saveLevelVisibilityFromAdmin); $('#resetLevelsBtn')?.addEventListener('click', resetLevelVisibilityFromAdmin); $('#saveTimerSettingsBtn')?.addEventListener('click', saveTimerSettingsFromAdmin); $('#resetTimerSettingsBtn')?.addEventListener('click', resetTimerSettingsFromAdmin); $('#dashboardDateFilter')?.addEventListener('change', renderAdminDashboard); $('#exportDataBtn')?.addEventListener('click', ()=>{ const data = {progress:getProgress(), records:getRecords(), attemptsLog:getAttemptsLog(), analytics:getAnalytics(), customQuestions:getCustomQuestions(), questionOverrides:getQuestionOverrides(), levelVisibility:getLevelVisibility()}; const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='kg-app-data.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); }); $('#exportExcelBtn')?.addEventListener('click', exportDashboardExcel); $('#exportJpegBtn')?.addEventListener('click', exportDashboardJpeg); $('#resetDashboardDataBtn')?.addEventListener('click', resetDashboardData); $('#saveQuizPasswordBtn')?.addEventListener('click', saveQuizAccessFromAdmin); $('#clearQuizPasswordBtn')?.addEventListener('click', clearQuizAccessFromAdmin); $('#saveTeacherTestBtn')?.addEventListener('click', saveTeacherTestFromAdmin); $('#clearTeacherTestBtn')?.addEventListener('click', clearTeacherTestFromAdmin); $('#downloadCurrentQuestionsExcelBtn')?.addEventListener('click', downloadCurrentQuestionsExcel); $('#bulkQuestionUpload')?.addEventListener('change', (e)=>{ const file=e.target.files?.[0]; if(file) importBulkQuestionsFromWorkbook(file); e.target.value=''; }); $('#saveAccessAccountBtn')?.addEventListener('click', saveAccessAccountFromAdmin); $('#accessAccountRole')?.addEventListener('change', ()=>renderAccessPermissions(Array.from(document.querySelectorAll('.perm-check:checked')).map(el=>el.value))); $('#toggleQuestionBankEditorBtn')?.addEventListener('click', (e)=> toggleCollapse('questionBankEditorBody', e.currentTarget)); $('#toggleStoredQuestionsBtn')?.addEventListener('click', (e)=> toggleCollapse('storedQuestionsWrap', e.currentTarget)); document.getElementById('testMode')?.addEventListener('change', ()=>{ renderTeacherQuestionPicker(); });
 document.getElementById('testGrade')?.addEventListener('input', ()=>{ renderTeacherQuestionPicker(); });
 document.getElementById('testGrade')?.addEventListener('change', ()=>{ renderTeacherQuestionPicker(); });
 document.getElementById('testQuestionList')?.addEventListener('input', renderTeacherQuestionPicker); document.getElementById('teacherQuestionPickerList')?.addEventListener('change', (e)=>{ if (e.target && e.target.classList.contains('teacher-question-check')) syncTeacherQuestionTextarea(); }); document.getElementById('selectAllTeacherQuestionsBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('.teacher-question-check').forEach(cb => cb.checked = true); syncTeacherQuestionTextarea(); }); document.getElementById('clearTeacherQuestionsBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('.teacher-question-check').forEach(cb => cb.checked = false); syncTeacherQuestionTextarea(); }); }
@@ -1265,7 +1276,15 @@ function bindQuestionEditorActions(){ document.querySelectorAll('[data-filter-gr
 function saveQuestionEdits(card){ if (!card) return; const id = card.dataset.qid; const grade = (card.dataset.grade || 'KG1').toLowerCase(); const payload = { text: $('.qe-text',card).value.trim(), skill: $('.qe-skill',card).value.trim() || 'Vocabulary', type: $('.qe-type',card).value.trim() || 'Choice', options: $('.qe-options',card).value.split('|').map(s=>s.trim()).filter(Boolean), answer: $('.qe-answer',card).value.trim(), difficulty: clamp(Number($('.qe-difficulty',card).value || 1),1,3), image: $('.qe-image',card).value.trim() || null }; if (!payload.text || !payload.options.length || !payload.answer){ alert('Question text, options, and answer are required.'); return; } const overrides = getQuestionOverrides(); overrides[id] = payload; writeJson(storeKeys.questionOverrides, overrides); alert('Question updated.'); }
 function resetQuestionEdits(card){ if (!card) return; const id = card.dataset.qid; const overrides = getQuestionOverrides(); delete overrides[id]; writeJson(storeKeys.questionOverrides, overrides); renderStoredQuestions(); }
 function deleteQuestionEdits(card){ if (!card) return; const id = card.dataset.qid; if (!id) return; const ok = window.confirm(((translations[getLang()] || {}).deleteQuestionConfirm) || 'Delete this question from the Question Bank?'); if (!ok) return; const deleted = getDeletedQuestions(); deleted[id] = { deletedAt:new Date().toISOString() }; writeJson(storeKeys.deletedQuestions, deleted); const overrides = getQuestionOverrides(); delete overrides[id]; writeJson(storeKeys.questionOverrides, overrides); renderStoredQuestions(); if (typeof renderTeacherQuestionPicker === 'function') renderTeacherQuestionPicker(); alert(((translations[getLang()] || {}).questionDeleted) || 'Question deleted.'); }
-function renderStoredQuestions(){ const list = $('#storedQuestionsList'); if (!list) return; const items = [...collectQuestionsWithMeta('kg1'), ...collectQuestionsWithMeta('kg2')].map(applyQuestionOverrides).filter(q => !(q && q._deleted)); list.innerHTML = items.length ? items.map(questionEditorCard).join('') : '<div class="stored-question"><h4>No questions yet.</h4><p>Add questions from the editor above.</p></div>'; bindQuestionEditorActions(); }
+function renderStoredQuestions(){
+  const list = $('#storedQuestionsList');
+  if (!list) return;
+  const keys = ['kg1','kg2','grade1','grade2','grade3','grade4','grade5','grade6'].concat((typeof window.getClasses==='function' ? window.getClasses().map(c => String(c.key||'').toLowerCase()) : []));
+  const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
+  const items = uniqueKeys.flatMap((key) => collectQuestionsWithMeta(key)).map(applyQuestionOverrides).filter(q => !(q && q._deleted));
+  list.innerHTML = items.length ? items.map(questionEditorCard).join('') : '<div class="stored-question"><h4>No questions yet.</h4><p>Add questions from the editor above.</p></div>';
+  bindQuestionEditorActions();
+}
 document.addEventListener('change', (e)=>{ if (e.target && e.target.id === 'newQImageFile'){ const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = ()=>{ e.target.dataset.savedImage = reader.result; }; reader.readAsDataURL(file); } });
 function registerPwa(){
   if (!('serviceWorker' in navigator)) return;
@@ -1733,13 +1752,6 @@ function isDuplicateQuestionEnhanced(text, list){
 
   window.addEventListener('load', function(){
     setTimeout(bindAccountSystem, 120);
-    const adminBtn = document.getElementById('adminLoginBtn');
-    if (adminBtn && !adminBtn.dataset.v3810){
-      adminBtn.dataset.v3810 = '1';
-      adminBtn.addEventListener('click', function(){
-        setTimeout(bindAccountSystem, 220);
-      });
-    }
   });
 })();
 
@@ -2051,20 +2063,6 @@ function isDuplicateQuestionEnhanced(text, list){
   }
 
   window.addEventListener('load', function(){
-    const loginBtn = document.getElementById('adminLoginBtn');
-    if (loginBtn && !loginBtn.dataset.v3811capture){
-      loginBtn.dataset.v3811capture = '1';
-      loginBtn.addEventListener('click', function(){
-        const account = window.getLoginAccount(document.getElementById('adminUser')?.value || '', document.getElementById('adminPass')?.value || '');
-        if (account){
-          setCurrentAccount(account);
-          setTimeout(function(){
-            window.applySectionPermissions(account);
-            bindAccessAccountManager();
-          }, 50);
-        }
-      }, true);
-    }
     setTimeout(bindAccessAccountManager, 150);
   });
 })();
@@ -2538,9 +2536,6 @@ function isDuplicateQuestionEnhanced(text, list){
   function bindProAccountManager(){
     if (!adminPageReady()) return;
 
-    const loginBtn = replaceNodeWithClone('adminLoginBtn');
-    if (loginBtn) loginBtn.addEventListener('click', handleLoginClick);
-
     const saveBtn = replaceNodeWithClone('saveAccessAccountBtn');
     if (saveBtn) saveBtn.addEventListener('click', function(event){
       event.preventDefault();
@@ -2682,15 +2677,6 @@ function isDuplicateQuestionEnhanced(text, list){
   if (!document.documentElement.dataset.v3813AccountFix) {
     document.documentElement.dataset.v3813AccountFix = '1';
     document.addEventListener('click', function(event){
-      const loginBtn = event.target.closest('#adminLoginBtn');
-      if (loginBtn) {
-        setTimeout(function(){
-          resolveCurrentAccount();
-          refreshAccountUi();
-        }, 80);
-        return;
-      }
-
       const saveBtn = event.target.closest('#saveAccessAccountBtn');
       if (saveBtn) {
         event.preventDefault();
@@ -2947,373 +2933,7 @@ Object.assign(translations.ar, {
   window.addEventListener('resize', normalizeMobileHeader, {passive:true});
 })();
 
-/* v12 play modes upgrade */
-(function(){
-  if (typeof document === 'undefined' || !document.body || document.body.dataset.page !== 'playtest') return;
-  const APP = window;
-  const MODE_KEYS = {
-    question_timer: 'playLeaderboard_question_timer_v1',
-    total_timer: 'playLeaderboard_total_timer_v1',
-    endless: 'playLeaderboard_endless_v1'
-  };
-  const ADMIN_RESET_KEYS = Object.values(MODE_KEYS);
-
-  const qs = (sel, root=document) => root.querySelector(sel);
-  const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-
-  APP.playGameMode = APP.playGameMode || 'question_timer';
-  APP.playTotalTimerMs = APP.playTotalTimerMs || 10*60*1000;
-  APP.playTotalTimerStartedAt = APP.playTotalTimerStartedAt || 0;
-  APP.playTotalTimerInterval = APP.playTotalTimerInterval || null;
-  APP.playQuestionTimerInterval = APP.playQuestionTimerInterval || null;
-  APP.playQuestionTimerGeneration = APP.playQuestionTimerGeneration || 0;
-  APP.playQuestionIndex = APP.playQuestionIndex || 0;
-  APP.playQuestionLimit = APP.playQuestionLimit || 10;
-  APP.activeModeBoard = APP.activeModeBoard || 'question_timer';
-  APP.activeModeTable = APP.activeModeTable || 'question_timer';
-
-  function modeLabel(mode){
-    if(mode === 'total_timer') return 'Total Timer';
-    if(mode === 'endless') return 'Endless';
-    return 'Question Timer';
-  }
-
-  function getModeStore(mode){
-    try{
-      const key = MODE_KEYS[mode] || MODE_KEYS.question_timer;
-      return JSON.parse(localStorage.getItem(key) || '[]');
-    }catch(_){
-      return [];
-    }
-  }
-
-  function setModeStore(mode, rows){
-    const key = MODE_KEYS[mode] || MODE_KEYS.question_timer;
-    localStorage.setItem(key, JSON.stringify(rows || []));
-  }
-
-  function modeSorted(mode){
-    const rows = getModeStore(mode).slice();
-    rows.sort((a,b)=>{
-      const scoreDiff = (Number(b.bestScore)||0) - (Number(a.bestScore)||0);
-      if(scoreDiff !== 0) return scoreDiff;
-      return new Date(b.lastPlayed||0).getTime() - new Date(a.lastPlayed||0).getTime();
-    });
-    return rows;
-  }
-
-  function renderModeTop3(mode){
-    const list = qs('#top3List, #playTop3List, .play-top3-list');
-    if(!list) return;
-    const rows = modeSorted(mode).slice(0,3);
-    if(!rows.length){
-      list.innerHTML = '<div class="muted-empty">No scores yet. Be the first champion!</div>';
-      return;
-    }
-    list.innerHTML = rows.map((row, idx)=>{
-      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
-      return `<div class="play-top3-item">
-        <div class="play-top3-medal">${medal}</div>
-        <div class="play-top3-main">
-          <div class="play-top3-name">${row.name || '-'}</div>
-          <div class="play-top3-grade">${row.grade || '-'}</div>
-          <div class="play-top3-sub">${modeLabel(mode)}</div>
-        </div>
-        <div class="play-top3-score">${Number(row.bestScore)||0}</div>
-      </div>`;
-    }).join('');
-  }
-
-  function renderModeTable(mode){
-    const table = qs('.play-board-card table, .leaderboard table, .data-table');
-    if(!table) return;
-    const tbody = table.querySelector('tbody');
-    if(!tbody) return;
-    const rows = modeSorted(mode);
-    if(!rows.length){
-      tbody.innerHTML = '<tr><td colspan="7">No leaderboard data yet.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = rows.map((row, idx)=>`
-      <tr>
-        <td>${idx+1}</td>
-        <td>${row.name || '-'}</td>
-        <td>${row.grade || '-'}</td>
-        <td>${row.studentId || '-'}</td>
-        <td>${Number(row.bestScore)||0}</td>
-        <td>${Number(row.attempts)||1}</td>
-        <td>${row.lastPlayed || '-'}</td>
-      </tr>
-    `).join('');
-  }
-
-  function refreshModeBoards(){
-    renderModeTop3(APP.activeModeBoard);
-    renderModeTable(APP.activeModeTable);
-    const modeBadge = qs('#modeBadge');
-    if(modeBadge) modeBadge.textContent = modeLabel(APP.playGameMode);
-  }
-
-  function bindModeTabs(){
-    qsa('[data-mode-board]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        APP.activeModeBoard = btn.dataset.modeBoard;
-        qsa('[data-mode-board]').forEach(x=>x.classList.toggle('active', x===btn));
-        renderModeTop3(APP.activeModeBoard);
-      });
-    });
-    qsa('[data-mode-table]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        APP.activeModeTable = btn.dataset.modeTable;
-        qsa('[data-mode-table]').forEach(x=>x.classList.toggle('active', x===btn));
-        renderModeTable(APP.activeModeTable);
-      });
-    });
-  }
-
-  function updateModeHint(){
-    const modeSelect = qs('#gameMode');
-    const totalWrap = qs('#totalTimerWrap');
-    const hint = qs('#gameModeHint');
-    if(!modeSelect || !hint) return;
-    const mode = modeSelect.value;
-    if(totalWrap) totalWrap.hidden = mode !== 'total_timer';
-    if(mode === 'total_timer') hint.textContent = 'Total timer: solve as many questions as you can before time ends.';
-    else if(mode === 'endless') hint.textContent = 'Endless: no timer, keep playing until you finish the set.';
-    else hint.textContent = 'Question timer: every question has its own timer.';
-  }
-
-  function stopQuestionTimer(){
-    APP.playQuestionTimerGeneration += 1;
-    if(APP.playQuestionTimerInterval){
-      clearInterval(APP.playQuestionTimerInterval);
-      APP.playQuestionTimerInterval = null;
-    }
-  }
-
-  function stopTotalTimer(){
-    if(APP.playTotalTimerInterval){
-      clearInterval(APP.playTotalTimerInterval);
-      APP.playTotalTimerInterval = null;
-    }
-  }
-
-  function writeTimerValue(seconds){
-    const timer = qs('#timerBadge, #timeBadge, #timeLeftValue');
-    if(timer) timer.textContent = Math.max(0, Math.ceil(seconds));
-  }
-
-  function writeModeProgress(){
-    const el = qs('#modeProgressValue');
-    if(!el) return;
-    if(APP.playGameMode === 'total_timer'){
-      const elapsed = Date.now() - APP.playTotalTimerStartedAt;
-      const left = Math.max(0, APP.playTotalTimerMs - elapsed);
-      el.textContent = `${Math.ceil(left/60000)} min left`;
-    }else if(APP.playGameMode === 'endless'){
-      el.textContent = `${APP.playQuestionIndex + 1} / ${APP.playQuestionLimit}`;
-    }else{
-      el.textContent = `${APP.playQuestionIndex + 1} / ${APP.playQuestionLimit}`;
-    }
-  }
-
-  function startQuestionTimer(seconds){
-    stopQuestionTimer();
-    if(APP.playGameMode !== 'question_timer'){
-      writeModeProgress();
-      return;
-    }
-    const generation = ++APP.playQuestionTimerGeneration;
-    let remaining = Number(seconds)||20;
-    writeTimerValue(remaining);
-    writeModeProgress();
-    APP.playQuestionTimerInterval = setInterval(()=>{
-      if(generation !== APP.playQuestionTimerGeneration){
-        clearInterval(APP.playQuestionTimerInterval);
-        return;
-      }
-      remaining -= 1;
-      writeTimerValue(remaining);
-      if(remaining <= 0){
-        stopQuestionTimer();
-        if(typeof APP.nextMixedQuestion === 'function') APP.nextMixedQuestion(true);
-      }
-    }, 1000);
-  }
-
-  function startTotalTimer(){
-    stopTotalTimer();
-    if(APP.playGameMode !== 'total_timer'){
-      writeModeProgress();
-      return;
-    }
-    APP.playTotalTimerStartedAt = Date.now();
-    const run = ()=>{
-      const leftMs = Math.max(0, APP.playTotalTimerMs - (Date.now() - APP.playTotalTimerStartedAt));
-      writeTimerValue(Math.ceil(leftMs/1000));
-      writeModeProgress();
-      if(leftMs <= 0){
-        stopTotalTimer();
-        stopQuestionTimer();
-        if(typeof APP.finishMixedQuiz === 'function') APP.finishMixedQuiz('time_up');
-      }
-    };
-    run();
-    APP.playTotalTimerInterval = setInterval(run, 1000);
-  }
-
-  function patchStartFlow(){
-    const startBtn = qs('#startMixedQuizBtn');
-    if(!startBtn || startBtn.dataset.modesBound === '1') return;
-    startBtn.dataset.modesBound = '1';
-
-    startBtn.addEventListener('click', ()=>{
-      const modeSel = qs('#gameMode');
-      const minsSel = qs('#totalTimerMinutes');
-      APP.playGameMode = modeSel ? modeSel.value : 'question_timer';
-      APP.playTotalTimerMs = ((minsSel ? Number(minsSel.value) : 10) || 10) * 60 * 1000;
-      APP.playQuestionLimit = 10;
-      APP.playQuestionIndex = 0;
-      stopQuestionTimer();
-      stopTotalTimer();
-      setTimeout(()=>{
-        const modeBadge = qs('#modeBadge');
-        if(modeBadge) modeBadge.textContent = modeLabel(APP.playGameMode);
-        writeModeProgress();
-        if(APP.playGameMode === 'total_timer') startTotalTimer();
-      }, 0);
-    }, true);
-  }
-
-  function patchQuizFns(){
-    if(typeof APP.renderMixedQuestion === 'function' && !APP.renderMixedQuestion.__modesPatched){
-      const originalRender = APP.renderMixedQuestion;
-      APP.renderMixedQuestion = function(){
-        const result = originalRender.apply(this, arguments);
-        writeModeProgress();
-        if(APP.playGameMode === 'question_timer'){
-          startQuestionTimer(20);
-        }else if(APP.playGameMode === 'endless'){
-          stopQuestionTimer();
-          writeTimerValue('∞');
-          writeModeProgress();
-        }else if(APP.playGameMode === 'total_timer'){
-          stopQuestionTimer();
-          writeModeProgress();
-        }
-        return result;
-      };
-      APP.renderMixedQuestion.__modesPatched = true;
-    }
-
-    if(typeof APP.nextMixedQuestion === 'function' && !APP.nextMixedQuestion.__modesPatched){
-      const originalNext = APP.nextMixedQuestion;
-      APP.nextMixedQuestion = function(){
-        APP.playQuestionIndex = Math.min((APP.playQuestionIndex||0) + 1, (APP.playQuestionLimit||10));
-        return originalNext.apply(this, arguments);
-      };
-      APP.nextMixedQuestion.__modesPatched = true;
-    }
-
-    if(typeof APP.finishMixedQuiz === 'function' && !APP.finishMixedQuiz.__modesPatched){
-      const originalFinish = APP.finishMixedQuiz;
-      APP.finishMixedQuiz = function(reason){
-        stopQuestionTimer();
-        stopTotalTimer();
-        try{
-          const score = Number(APP.mixedScore || APP.currentScore || 0);
-          const gradeSel = qs('#mixedGrade, #gradeSelect');
-          const studentId = (qs('#studentId') || {}).value || '';
-          const playerName = (qs('#playerName') || {}).value || 'Player';
-          const gradeVal = gradeSel ? gradeSel.value : '-';
-          const rows = getModeStore(APP.playGameMode);
-          const found = rows.find(r => (r.name||'') === playerName && (r.studentId||'') === studentId && (r.grade||'') === gradeVal);
-          const playedAt = new Date().toLocaleString();
-          if(found){
-            found.bestScore = Math.max(Number(found.bestScore)||0, score);
-            found.lastPlayed = playedAt;
-            found.attempts = (Number(found.attempts)||1) + 1;
-          }else{
-            rows.push({name:playerName, studentId:studentId || '-', grade:gradeVal || '-', bestScore:score, attempts:1, lastPlayed:playedAt});
-          }
-          setModeStore(APP.playGameMode, rows);
-        }catch(_){}
-        refreshModeBoards();
-        return originalFinish.apply(this, arguments);
-      };
-      APP.finishMixedQuiz.__modesPatched = true;
-    }
-  }
-
-  function patchAdminReset(){
-    if(!APP.resetAllTeacherData){
-      APP.resetAllTeacherData = function(){
-        ADMIN_RESET_KEYS.forEach(k => localStorage.removeItem(k));
-        refreshModeBoards();
-      };
-      return;
-    }
-    if(APP.resetAllTeacherData.__modesPatched) return;
-    const originalReset = APP.resetAllTeacherData;
-    APP.resetAllTeacherData = function(){
-      ADMIN_RESET_KEYS.forEach(k => localStorage.removeItem(k));
-      const result = originalReset.apply(this, arguments);
-      refreshModeBoards();
-      return result;
-    };
-    APP.resetAllTeacherData.__modesPatched = true;
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const modeSel = qs('#gameMode');
-    if(modeSel && !modeSel.dataset.bound){
-      modeSel.dataset.bound = '1';
-      modeSel.addEventListener('change', updateModeHint);
-      updateModeHint();
-    }
-    bindModeTabs();
-    patchStartFlow();
-    patchQuizFns();
-    patchAdminReset();
-    refreshModeBoards();
-  });
-
-  window.addEventListener('load', ()=>{
-    patchQuizFns();
-    patchAdminReset();
-    refreshModeBoards();
-  });
-})();
-
-/* visible mode cards sync */
-(function(){
-  function syncModeCardsUI(){
-    var selected = document.querySelector('input[name="gameModeCards"]:checked');
-    document.querySelectorAll('.mode-card').forEach(function(card){
-      card.classList.toggle('active', !!selected && (card.getAttribute('data-mode-value') || card.getAttribute('data-mode-card')) === selected.value);
-    });
-    var hiddenMode = document.getElementById('gameMode');
-    if(hiddenMode && selected) hiddenMode.value = selected.value;
-    var totalWrap = document.getElementById('totalTimerInlineWrap');
-    if(totalWrap) totalWrap.hidden = !(selected && selected.value === 'total_timer');
-    var oldTotal = document.getElementById('totalTimerMinutes');
-    var newTotal = document.getElementById('totalTimerMinutesInline');
-    if(oldTotal && newTotal) oldTotal.value = newTotal.value;
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    var radios = document.querySelectorAll('input[name="gameModeCards"]');
-    radios.forEach(function(radio){
-      radio.addEventListener('change', syncModeCardsUI);
-    });
-    var newTotal = document.getElementById('totalTimerMinutesInline');
-    var oldTotal = document.getElementById('totalTimerMinutes');
-    if(newTotal && oldTotal){
-      newTotal.addEventListener('change', function(){ oldTotal.value = newTotal.value; });
-    }
-    syncModeCardsUI();
-  });
-})();
+/* legacy v12 play modes upgrade removed; play-main.js owns play timers and game modes */
 
 /* visible mode cards final sync */
 (function(){
@@ -3530,14 +3150,7 @@ document.addEventListener('DOMContentLoaded', function(){
     wireStudentsManagerDirect();
     patchExpandAll();
     wrapApplySectionPermissions();
-    var loginBtn = document.getElementById('adminLoginBtn');
-    if (loginBtn && loginBtn.dataset.studentsManagerLoginWired !== '1'){
-      loginBtn.dataset.studentsManagerLoginWired = '1';
-      loginBtn.addEventListener('click', function(){
-        window.setTimeout(afterAdminReady, 300);
-        window.setTimeout(afterAdminReady, 900);
-      });
-    }
+    window.setTimeout(afterAdminReady, 300);
   });
 })();
 
@@ -3914,7 +3527,7 @@ window.__cleanupNoop = true;
   const KEY_CUSTOM_Q = 'kgEnglishCustomQuestionsV23';
   const KEY_TESTS = 'kgEnglishTeacherTestsV23';
   const KEY_LEVEL_VIS = 'kgEnglishLevelVisibilityV7';
-  const KEY_TIMER = 'kgEnglishTimerSettingsV21';
+  const KEY_TIMER = 'kgEnglishTimerSettingsV23';
   const KEY_ACCESS = 'kgEnglishQuizAccessV29';
   const BUILTIN_KEYS = ['kg1','kg2','grade1','grade2','grade3','grade4','grade5','grade6'];
   const BUILTIN_LABELS = {
@@ -4312,14 +3925,7 @@ document.addEventListener('click', function(e){
   }
   window.__kgStableAdminLogin = stableAdminLogin;
 
-  function bindStableLogin(){
-    var btn = document.getElementById('adminLoginBtn');
-    if (!btn || btn.dataset.stableLoginBound === '1') return;
-    var clone = btn.cloneNode(true);
-    clone.dataset.stableLoginBound = '1';
-    btn.parentNode && btn.parentNode.replaceChild(clone, btn);
-    clone.addEventListener('click', stableAdminLogin);
-  }
+  function bindStableLogin(){ return; }
 
   function safeRenderStoredQuestions(){
     var list = document.getElementById('storedQuestionsList');
@@ -4792,13 +4398,6 @@ document.addEventListener('click', function(e){
   }
 
   function bindAdminButtons(){
-    var loginBtn = document.getElementById('adminLoginBtn');
-    if (loginBtn && loginBtn.parentNode) {
-      var clone = loginBtn.cloneNode(true);
-      clone.dataset.secureLoginBound = '1';
-      loginBtn.parentNode.replaceChild(clone, loginBtn);
-      clone.addEventListener('click', handleStableLogin);
-    }
     var saveBtn = document.getElementById('saveAccessAccountBtn');
     if (saveBtn && saveBtn.parentNode) {
       var saveClone = saveBtn.cloneNode(true);
@@ -4899,13 +4498,6 @@ document.addEventListener('click', function(e){
 
   function bindFinalAdminButtons(){
     if (!document.body || document.body.dataset.page !== 'admin') return;
-    var loginBtn = document.getElementById('adminLoginBtn');
-    if (loginBtn && loginBtn.parentNode) {
-      var clone = loginBtn.cloneNode(true);
-      clone.dataset.v14LoginBound = '1';
-      loginBtn.parentNode.replaceChild(clone, loginBtn);
-      clone.addEventListener('click', backendAwareAdminLogin);
-    }
   }
 
   function safeExportData(){
@@ -4988,3 +4580,131 @@ document.addEventListener('click', function(e){
     }
   } catch (e) {}
 })();
+
+
+/* ---- BEGIN v20-authoritative-cleanup.js ---- */
+(function(){
+  if (typeof window === 'undefined') return;
+
+  function onReady(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
+    else fn();
+  }
+
+  function gradeTimerSeconds(key){
+    var grade = String(key || '').trim().toLowerCase();
+    if (grade === 'kg1') return 15;
+    if (grade === 'kg2') return 18;
+    return 18;
+  }
+  try { window.__kgGradeTimerSeconds = gradeTimerSeconds; } catch (error) {}
+
+  try {
+    var originalTimerEnabledFor = timerEnabledFor;
+    timerEnabledFor = function(grade){
+      var cfg = getTimerSettings();
+      var key = String(grade || '').trim().toLowerCase();
+      if (!(key in cfg) && /^grade[1-6]$/.test(key)) return true;
+      return originalTimerEnabledFor(grade);
+    };
+    window.timerEnabledFor = timerEnabledFor;
+  } catch (error) {}
+
+  try { window.collectQuestionsWithMeta = collectQuestionsWithMeta; } catch (error) {}
+  try { window.applyQuestionOverrides = applyQuestionOverrides; } catch (error) {}
+  try { window.questionEditorCard = questionEditorCard; } catch (error) {}
+  try { window.bindQuestionEditorActions = bindQuestionEditorActions; } catch (error) {}
+
+  try {
+    var originalAllQuestionsFor = allQuestionsFor;
+    allQuestionsFor = function(grade){
+      var key = String(grade || '').trim().toLowerCase();
+      var rows = originalAllQuestionsFor(key) || [];
+      if (rows.length) return rows;
+      try {
+        var bulk = Array.isArray(QUIZ_BULK_PACKAGE[key]) ? QUIZ_BULK_PACKAGE[key] : [];
+        return sanitizeQuestions(bulk.map(function(q){ return Object.assign({}, q); }));
+      } catch (error) {
+        return rows;
+      }
+    };
+    window.allQuestionsFor = allQuestionsFor;
+  } catch (error) {}
+
+  function secureAdminLogin(event){
+    if (event) {
+      event.preventDefault();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    }
+    if (typeof window.__kgStableAdminLogin === 'function') return window.__kgStableAdminLogin(event);
+  }
+
+  function bindAuthoritativeAdminLogin(){
+    if (!document.body || document.body.dataset.page !== 'admin') return;
+    var loginBtn = document.getElementById('adminLoginBtn');
+    if (loginBtn) {
+      if (loginBtn.dataset.authoritativeLoginBound === '1') return;
+      if (loginBtn.parentNode) {
+        var clone = loginBtn.cloneNode(true);
+        clone.dataset.authoritativeLoginBound = '1';
+        loginBtn.parentNode.replaceChild(clone, loginBtn);
+        clone.addEventListener('click', secureAdminLogin);
+        loginBtn = clone;
+      } else {
+        loginBtn.dataset.authoritativeLoginBound = '1';
+        loginBtn.addEventListener('click', secureAdminLogin);
+      }
+    }
+    var exportBtn = document.getElementById('exportDataBtn');
+    if (exportBtn && exportBtn.parentNode && typeof window.__kgSafeExportData === 'function') {
+      var exportClone = exportBtn.cloneNode(true);
+      exportBtn.parentNode.replaceChild(exportClone, exportBtn);
+      exportClone.addEventListener('click', function(e){ e.preventDefault(); window.__kgSafeExportData(); });
+    }
+  }
+
+  try {
+    initAdmin = function(){ bindAuthoritativeAdminLogin(); };
+    window.initAdmin = initAdmin;
+  } catch (error) {}
+
+  function ensureClassQuestionsReady(){
+    if (!document.body || document.body.dataset.page !== 'quiz') return;
+    var grade = String(document.body.dataset.grade || '').trim().toLowerCase();
+    if (!/^grade[1-6]$/.test(grade)) return;
+    try {
+      if (typeof allQuestionsFor === 'function' && !allQuestionsFor(grade).length && Array.isArray(QUIZ_BULK_PACKAGE[grade]) && QUIZ_BULK_PACKAGE[grade].length) {
+        baseQuestionPools[grade] = (baseQuestionPools[grade] || []).concat(QUIZ_BULK_PACKAGE[grade]);
+      }
+    } catch (error) {}
+  }
+
+  function finalRenderStoredQuestions(){
+    var list = document.getElementById('storedQuestionsList');
+    if (!list || typeof collectQuestionsWithMeta !== 'function') return;
+    var keys = ['kg1','kg2','grade1','grade2','grade3','grade4','grade5','grade6'];
+    try {
+      if (typeof window.getClasses === 'function') {
+        (window.getClasses() || []).forEach(function(cls){ if (cls && cls.key) keys.push(String(cls.key).toLowerCase()); });
+      }
+    } catch (error) {}
+    keys = Array.from(new Set(keys));
+    var items = [];
+    keys.forEach(function(key){ items = items.concat(collectQuestionsWithMeta(key) || []); });
+    items = items.map(function(q){ return typeof applyQuestionOverrides === 'function' ? applyQuestionOverrides(q) : q; }).filter(function(q){ return !(q && q._deleted); });
+    if (!items.length) list.innerHTML = '<div class="stored-question"><h4>No questions yet.</h4><p>Add questions from the editor above.</p></div>';
+    else list.innerHTML = items.map(function(q){ return typeof questionEditorCard === 'function' ? questionEditorCard(q) : '<div class="stored-question"><h4>' + String(q && q.text || 'Question') + '</h4></div>'; }).join('');
+    if (typeof bindQuestionEditorActions === 'function') bindQuestionEditorActions();
+  }
+  try { window.renderStoredQuestions = finalRenderStoredQuestions; } catch (error) {}
+
+  onReady(function(){
+    bindAuthoritativeAdminLogin();
+    ensureClassQuestionsReady();
+  });
+  window.addEventListener('load', function(){
+    bindAuthoritativeAdminLogin();
+    ensureClassQuestionsReady();
+  });
+})();
+/* ---- END v20-authoritative-cleanup.js ---- */

@@ -76,3 +76,17 @@ V17 notes:
 
 
 Additional compatibility fix in this build: JSON API body parsing now works on plain Node-style servers too, not only on pre-parsed Vercel request bodies.
+V20 notes:
+- Grade 1–6 question pools are now available on first load without depending on a later bulk merge.
+- Quiz init now guards itself immediately to avoid double-start races.
+- The class/question bank renderer now covers KG1, KG2, Grade 1–6, and custom classes.
+- The admin login button is rebound authoritatively at the end of the runtime so older duplicate handlers do not win.
+- The quiz timer helper now uses a single grade-duration helper and the stale V21 timer key was aligned to V23.
+- The service worker cache version was bumped so clients pick up the revised scripts cleanly.
+
+
+V21 notes:
+- Duplicate admin login button bindings were removed from old patch blocks; the runtime now keeps one final authoritative admin login handler.
+- The old v12 play timer block was removed from app-core.js so play timer debugging now points only to play-main.js.
+- A sample .env.example file is included for ACCESS_ACCOUNTS_SESSION_SECRET, ALLOWED_ORIGINS, and optional KV/Upstash configuration.
+- app-core.js still contains legacy patch history, but the remaining live admin login path is now consolidated to the final secure flow.

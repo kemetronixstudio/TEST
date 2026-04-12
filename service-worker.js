@@ -1,4 +1,4 @@
-const CACHE = 'kg-english-v-clean-audit-5';
+const CACHE = 'kg-english-v-clean-audit-6';
 const ASSETS = [
   "./index.html",
   "./kg1.html",
