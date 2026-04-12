@@ -15,13 +15,13 @@
 - Student cloud quiz progress falls back to local storage when `/api/student/*` is unavailable.
 - Service worker now precaches bundled `assets/quiz-bulk/*` images and `svg/school.png`.
 - `class.html` now defaults to `kg1` if no `?grade=` parameter is provided.
-- Committed session secret file was removed from the bundle.
+- Committed session secret file was removed from the bundle and runtime secrets now default outside the public web root.
 
 ## Bootstrap admins
-- Username: `KEMETRONIX`
-- Password: `H01002439054`
-- Username: `Dr. Tarek`
-- Password: `T01032188008`
+- Built-in admin accounts are configured in the backend bundle.
+- Usernames are `KEMETRONIX` and `Dr. Tarek`.
+- Passwords are intentionally not published in this public README.
+
 
 ## Local static preview
 ```bash

@@ -1560,12 +1560,45 @@ if (delStudent) { try { await api('?action=delete-student', { method:'DELETE', b
   const PAGE = document.body?.dataset?.page || '';
   if (PAGE !== 'admin') return;
   const BACKUP_KEYS = [
-    'kgQuizAdvancedConfigsV1','kgQuizLevelVisibilityV1','kgQuizTimerSettingsV1','kgQuizAccessPasswordsV1',
-    'kgTeacherTestV1','kgTeacherArchivedTestsV1','kgTeacherAuditLogV1','kgTeacherDashboardDataV1',
-    'kgEnglishCustomQuestionsV23','kgQuestionOverridesV1','kgCustomClassesV1',
-    'kgStudentProgressV1','kgStudentRecordsV1','kgAttemptsLogV1','kgAnalyticsV1',
-    'kgPlayLeaderboardV1','kgPlayConfigV1'
+    'kgQuizAdvancedConfigsV1',
+    'kgAppLang',
+    'kgKidsThemeV1',
+    'kgEnglishProgressV7',
+    'kgEnglishStudentRecordsV7',
+    'kgEnglishAnalyticsV7',
+    'kgEnglishCertificateV7',
+    'kgEnglishCustomQuestionsV23',
+    'kgEnglishQuestionOverridesV7',
+    'kgEnglishDeletedQuestionsV2',
+    'kgEnglishLevelVisibilityV7',
+    'kgEnglishAttemptsLogV22',
+    'kgEnglishTimerSettingsV23',
+    'kgEnglishQuizAccessV29',
+    'kgEnglishTeacherTestsV23',
+    'kgEnglishArchivedTeacherTestsV23',
+    'kgEnglishStudentRotationV23',
+    'kgEnglishCustomClassesV29',
+    'kgHomeworkStaticStoreV1',
+    'kgStudentIdentityV1',
+    'kgStudentCloudLocalV1',
+    'kgPlayLeaderboardLocalV1',
+    'kgPlayTestSound',
+    'kgPlayTestAutoNext'
   ];
+  const BACKUP_IMPORT_ALIASES = {
+    kgQuizLevelVisibilityV1: 'kgEnglishLevelVisibilityV7',
+    kgQuizTimerSettingsV1: 'kgEnglishTimerSettingsV23',
+    kgQuizAccessPasswordsV1: 'kgEnglishQuizAccessV29',
+    kgTeacherTestV1: 'kgEnglishTeacherTestsV23',
+    kgTeacherArchivedTestsV1: 'kgEnglishArchivedTeacherTestsV23',
+    kgQuestionOverridesV1: 'kgEnglishQuestionOverridesV7',
+    kgCustomClassesV1: 'kgEnglishCustomClassesV29',
+    kgStudentProgressV1: 'kgEnglishProgressV7',
+    kgStudentRecordsV1: 'kgEnglishStudentRecordsV7',
+    kgAttemptsLogV1: 'kgEnglishAttemptsLogV22',
+    kgAnalyticsV1: 'kgEnglishAnalyticsV7',
+    kgPlayLeaderboardV1: 'kgPlayLeaderboardLocalV1'
+  };
   const DRAFT_KEY = 'kgAdminDraftsV2';
   function jread(key, fallback){ try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch(e){ return fallback; } }
   function jwrite(key, value){ try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){} }
@@ -1692,7 +1725,8 @@ if (delStudent) { try { await api('?action=delete-student', { method:'DELETE', b
       const data = payload && typeof payload === 'object' ? payload.data : null;
       if (!data || typeof data !== 'object') throw new Error('Invalid backup format');
       Object.keys(data).forEach(key => {
-        if (BACKUP_KEYS.includes(key) && typeof data[key] === 'string') localStorage.setItem(key, data[key]);
+        const targetKey = BACKUP_KEYS.includes(key) ? key : (BACKUP_IMPORT_ALIASES[key] || '');
+        if (targetKey && typeof data[key] === 'string') localStorage.setItem(targetKey, data[key]);
       });
       setStatus(t('Backup imported. Refreshing the dashboard...','تم استيراد النسخة. يتم تحديث اللوحة...'), 'success');
       setTimeout(() => window.location.reload(), 550);

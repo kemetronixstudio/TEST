@@ -6,7 +6,9 @@
   display:none !important;
 }
 
-/* remove empty spacer box */
-div:empty {
+/* remove only empty snapshot/spacer leftovers without touching decorative backgrounds */
+.quick-school-snapshot:empty,
+[data-section*="snapshot"]:empty,
+.snapshot:empty {
   display:none !important;
 }
