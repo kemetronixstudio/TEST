@@ -47,7 +47,7 @@ module.exports = withCors(async function handler(req, res) {
       res.end(JSON.stringify({ ok: false, error: 'Method not allowed' }));
       return;
     }
-    const body = readJsonBody(req);
+    const body = await readJsonBody(req);
     if (action === 'reset') {
       const auth = await accessBackend.requireAdmin(req);
       if (!auth.ok) {

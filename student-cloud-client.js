@@ -79,7 +79,7 @@
     return [grade, count || 'custom', slugify(label || 'quiz')].join('|');
   }
   function ensureQuizIdentityFields(grade){
-    const anchor = document.querySelector('.student-form-box');
+    const anchor = document.querySelector('.student-form-box') || ($('studentName') && $('studentName').parentElement) || document.querySelector('main') || document.body;
     if (!anchor || $('studentClass')) return;
     const wrap = document.createElement('div');
     wrap.className = 'student-cloud-grid';

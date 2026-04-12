@@ -17,7 +17,7 @@ module.exports = withCors(async function handler(req, res) {
     return;
   }
   try {
-    const body = readJsonBody(req);
+    const body = await readJsonBody(req);
     const ident = body.identity || body || {};
     const identityKey = String((ident.studentId || ident.identityKey || ident.name || 'guest')).trim().toLowerCase();
     const actionKey = 'student-start:' + identityKey + ':' + String(body.quizKey || body.quizId || body.quiz || '');

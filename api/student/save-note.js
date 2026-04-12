@@ -26,7 +26,7 @@ module.exports = withCors(async function handler(req, res) {
       return;
     }
     setAuthCookie(req, res, auth.token);
-    const body = readJsonBody(req);
+    const body = await readJsonBody(req);
     const result = await backend.saveTeacherNote({ ...body, author: auth.account && auth.account.user ? auth.account.user : '' });
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');

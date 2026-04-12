@@ -15,7 +15,7 @@ module.exports = withCors(async function handler(req, res) {
   try {
     const url = new URL(req.url || '/api/homework', 'http://localhost');
     const action = String(url.searchParams.get('action') || '').trim().toLowerCase();
-    const body = req.method === 'POST' || req.method === 'DELETE' ? readJsonBody(req) : {};
+    const body = req.method === 'POST' || req.method === 'DELETE' ? await readJsonBody(req) : {};
     const isStudentAction = action === 'available' || action === 'start' || action === 'submit' || action === 'identify-student' || action === 'parent-summary';
     if (!isStudentAction) {
       const auth = await access.requireAuthorized(req, 'teacherTest');

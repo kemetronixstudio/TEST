@@ -73,3 +73,6 @@ V17 notes:
 - Homework countdown now uses a real deadline timestamp to avoid background-tab drift.
 - Admin Students Manager now accepts an optional custom Student ID.
 - Play grade values are normalized to canonical keys (grade1..grade6).
+
+
+Additional compatibility fix in this build: JSON API body parsing now works on plain Node-style servers too, not only on pre-parsed Vercel request bodies.
