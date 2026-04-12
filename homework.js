@@ -11,6 +11,118 @@
   const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
   const LOCAL_KEY = 'kgHomeworkStaticStoreV1';
+  const PREVIEW_HOMEWORK_SEED = {
+  "assignments": [
+    {
+      "id": "HW-1",
+      "title": "Test Homework",
+      "grade": "KG1",
+      "classes": [
+        "A"
+      ],
+      "date": "2026-04-11",
+      "mode": "select",
+      "questions": [
+        {
+          "text": "Q1",
+          "options": [
+            "a",
+            "b"
+          ],
+          "answer": "a",
+          "skill": "Test",
+          "type": "Question",
+          "image": null
+        }
+      ],
+      "useTimer": false,
+      "timerMinutes": 0,
+      "usePassword": false,
+      "password": "",
+      "tryLimit": 0,
+      "createdAt": "2026-04-09T17:59:50.914Z"
+    }
+  ],
+  "submissions": [
+    {
+      "id": "HWR-1775757590924-8885bghz",
+      "homeworkId": "HW-1",
+      "homeworkTitle": "Test Homework",
+      "date": "2026-04-11",
+      "studentName": "Ali",
+      "studentId": "1",
+      "className": "A",
+      "grade": "KG1",
+      "identity": {
+        "name": "Ali",
+        "studentId": "1",
+        "grade": "KG1",
+        "className": "A",
+        "identityKey": "KG1::a::1::ali"
+      },
+      "token": "HWS-1775757590923-6g4x008t",
+      "score": 1,
+      "percent": 100,
+      "questionCount": 1,
+      "triesUsed": 1,
+      "wrongAnswersCount": 0,
+      "wrongAnswers": [],
+      "answers": [
+        {
+          "index": 0,
+          "questionText": "Q1",
+          "chosen": "a",
+          "correct": true,
+          "expected": "a",
+          "timedOut": false,
+          "answeredAt": "2026-04-09T17:59:50.924Z"
+        }
+      ],
+      "questions": [
+        {
+          "text": "Q1",
+          "options": [
+            "a",
+            "b"
+          ],
+          "answer": "a",
+          "skill": "Test",
+          "type": "Question",
+          "image": null
+        }
+      ],
+      "submittedAt": "2026-04-09T17:59:50.924Z",
+      "timeUp": false,
+      "timerMinutes": 0,
+      "usedTimer": false
+    }
+  ],
+  "attempts": {
+    "KG1::a::1::ali::HW-1": {
+      "count": 1,
+      "sessions": [
+        {
+          "token": "HWS-1775757590923-6g4x008t",
+          "startedAt": "2026-04-09T17:59:50.923Z",
+          "submittedAt": "2026-04-09T17:59:50.924Z",
+          "submissionId": "HWR-1775757590924-8885bghz"
+        }
+      ]
+    }
+  },
+  "students": [
+    {
+      "id": "STD-1",
+      "name": "Ali",
+      "grade": "KG1",
+      "className": "A",
+      "studentId": "1",
+      "pin": "pbkdf2$120000$e066151bdcec57173be1383403b1eb94$f619e9edcaf4a7be8644cccaf62a8e2aa591f52c7e9c469b81d2073a2a7bd0f1",
+      "active": true,
+      "createdAt": "2026-04-11T00:00:00.000Z"
+    }
+  ]
+};
 
   function normalizeText(value){ return String(value || '').trim().toLowerCase(); }
   function slugify(value){ return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
@@ -29,14 +141,9 @@
       if (saved) return ensureStoreShape(JSON.parse(saved));
     } catch (error) {}
     if (isLocalPreview) {
-      try {
-        const res = await fetch('data/homework.json', { cache:'no-store' });
-        if (!res.ok) throw new Error('Preview data is unavailable.');
-        const data = await res.json();
-        const safe = ensureStoreShape(data);
-        try { localStorage.setItem(LOCAL_KEY, JSON.stringify(safe)); } catch (error) {}
-        return safe;
-      } catch (error) {}
+      const safe = ensureStoreShape(PREVIEW_HOMEWORK_SEED);
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(safe)); } catch (error) {}
+      return safe;
     }
     return ensureStoreShape(null);
   }

@@ -1069,7 +1069,7 @@ function renderCertificate(){
   $('#downloadPdfBtn')?.addEventListener('click', async ()=>{ const blob = await makeCertificatePdfBlob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${data.studentName}-certificate.pdf`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); });
   $('#shareCertBtn')?.addEventListener('click', async ()=>{ const blob = await makeCertificatePdfBlob(); const file = new File([blob], `${data.studentName}-certificate.pdf`, {type:'application/pdf'}); if (navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({title:'Certificate', files:[file], text:`${data.studentName} - ${data.percent}%`}); } else { window.open(`https://wa.me/?text=${encodeURIComponent(`${data.studentName} finished ${data.grade} with ${data.percent}%`)}`,'_blank'); } });
 }
-function initAdmin(){ if (document.body.dataset.page !== 'admin') return; const loginCard = $('#adminLoginCard'); const panel = $('#adminPanel'); $('#__deprecatedLegacyAdminLaunchButton')?.addEventListener('click', async ()=>{ const user = $('#adminUser').value.trim(); const pass = $('#adminPass').value.trim(); let account = getLoginAccount(user, pass); if (!account) account = await tryBackendAdminLogin(user, pass); if (!account){ alert(getLang()==='ar'?'اسم المشرف أو كلمة المرور غير صحيحة.':'Wrong admin name or password.'); return; } loginCard.classList.add('hidden'); panel.classList.remove('hidden'); applySectionPermissions(account); populateDashboardDateFilter(); renderAdminDashboard(); renderLevelVisibilityEditor(); renderTimerSettingsEditor(); renderQuizAccessEditor(); renderTeacherTestEditor(); renderAccessPermissions([]); renderAccessAccountsList(); renderTeacherQuestionPicker(); wireCollapseButtons(); wireQuestionFilterButtons(); const cm=document.querySelector('[data-section-key="classManager"]'); if(cm){ cm.classList.remove('hidden'); cm.style.display=''; } }); $('#addQuestionBtn')?.addEventListener('click', addCustomQuestion); $('#showStoredQuestionsBtn')?.addEventListener('click', renderStoredQuestions); $('#saveLevelsBtn')?.addEventListener('click', saveLevelVisibilityFromAdmin); $('#resetLevelsBtn')?.addEventListener('click', resetLevelVisibilityFromAdmin); $('#saveTimerSettingsBtn')?.addEventListener('click', saveTimerSettingsFromAdmin); $('#resetTimerSettingsBtn')?.addEventListener('click', resetTimerSettingsFromAdmin); $('#dashboardDateFilter')?.addEventListener('change', renderAdminDashboard); $('#exportDataBtn')?.addEventListener('click', ()=>{ const data = {progress:getProgress(), records:getRecords(), attemptsLog:getAttemptsLog(), analytics:getAnalytics(), customQuestions:getCustomQuestions(), questionOverrides:getQuestionOverrides(), levelVisibility:getLevelVisibility(), accessAccounts:getAccessAccounts()}; const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='kg-app-data.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); }); $('#exportExcelBtn')?.addEventListener('click', exportDashboardExcel); $('#exportJpegBtn')?.addEventListener('click', exportDashboardJpeg); $('#resetDashboardDataBtn')?.addEventListener('click', resetDashboardData); $('#saveQuizPasswordBtn')?.addEventListener('click', saveQuizAccessFromAdmin); $('#clearQuizPasswordBtn')?.addEventListener('click', clearQuizAccessFromAdmin); $('#saveTeacherTestBtn')?.addEventListener('click', saveTeacherTestFromAdmin); $('#clearTeacherTestBtn')?.addEventListener('click', clearTeacherTestFromAdmin); $('#downloadCurrentQuestionsExcelBtn')?.addEventListener('click', downloadCurrentQuestionsExcel); $('#bulkQuestionUpload')?.addEventListener('change', (e)=>{ const file=e.target.files?.[0]; if(file) importBulkQuestionsFromWorkbook(file); e.target.value=''; }); $('#saveAccessAccountBtn')?.addEventListener('click', saveAccessAccountFromAdmin); $('#accessAccountRole')?.addEventListener('change', ()=>renderAccessPermissions(Array.from(document.querySelectorAll('.perm-check:checked')).map(el=>el.value))); $('#toggleQuestionBankEditorBtn')?.addEventListener('click', (e)=> toggleCollapse('questionBankEditorBody', e.currentTarget)); $('#toggleStoredQuestionsBtn')?.addEventListener('click', (e)=> toggleCollapse('storedQuestionsWrap', e.currentTarget)); document.getElementById('testMode')?.addEventListener('change', ()=>{ renderTeacherQuestionPicker(); });
+function initAdmin(){ if (document.body.dataset.page !== 'admin') return; const loginCard = $('#adminLoginCard'); const panel = $('#adminPanel'); $('#adminLoginBtn')?.addEventListener('click', async ()=>{ const user = $('#adminUser').value.trim(); const pass = $('#adminPass').value.trim(); let account = getLoginAccount(user, pass); if (!account) account = await tryBackendAdminLogin(user, pass); if (!account){ alert(getLang()==='ar'?'اسم المشرف أو كلمة المرور غير صحيحة.':'Wrong admin name or password.'); return; } loginCard.classList.add('hidden'); panel.classList.remove('hidden'); applySectionPermissions(account); populateDashboardDateFilter(); renderAdminDashboard(); renderLevelVisibilityEditor(); renderTimerSettingsEditor(); renderQuizAccessEditor(); renderTeacherTestEditor(); renderAccessPermissions([]); renderAccessAccountsList(); renderTeacherQuestionPicker(); wireCollapseButtons(); wireQuestionFilterButtons(); const cm=document.querySelector('[data-section-key="classManager"]'); if(cm){ cm.classList.remove('hidden'); cm.style.display=''; } }); $('#addQuestionBtn')?.addEventListener('click', addCustomQuestion); $('#showStoredQuestionsBtn')?.addEventListener('click', renderStoredQuestions); $('#saveLevelsBtn')?.addEventListener('click', saveLevelVisibilityFromAdmin); $('#resetLevelsBtn')?.addEventListener('click', resetLevelVisibilityFromAdmin); $('#saveTimerSettingsBtn')?.addEventListener('click', saveTimerSettingsFromAdmin); $('#resetTimerSettingsBtn')?.addEventListener('click', resetTimerSettingsFromAdmin); $('#dashboardDateFilter')?.addEventListener('change', renderAdminDashboard); $('#exportDataBtn')?.addEventListener('click', ()=>{ const data = {progress:getProgress(), records:getRecords(), attemptsLog:getAttemptsLog(), analytics:getAnalytics(), customQuestions:getCustomQuestions(), questionOverrides:getQuestionOverrides(), levelVisibility:getLevelVisibility(), accessAccounts:getAccessAccounts()}; const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='kg-app-data.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); }); $('#exportExcelBtn')?.addEventListener('click', exportDashboardExcel); $('#exportJpegBtn')?.addEventListener('click', exportDashboardJpeg); $('#resetDashboardDataBtn')?.addEventListener('click', resetDashboardData); $('#saveQuizPasswordBtn')?.addEventListener('click', saveQuizAccessFromAdmin); $('#clearQuizPasswordBtn')?.addEventListener('click', clearQuizAccessFromAdmin); $('#saveTeacherTestBtn')?.addEventListener('click', saveTeacherTestFromAdmin); $('#clearTeacherTestBtn')?.addEventListener('click', clearTeacherTestFromAdmin); $('#downloadCurrentQuestionsExcelBtn')?.addEventListener('click', downloadCurrentQuestionsExcel); $('#bulkQuestionUpload')?.addEventListener('change', (e)=>{ const file=e.target.files?.[0]; if(file) importBulkQuestionsFromWorkbook(file); e.target.value=''; }); $('#saveAccessAccountBtn')?.addEventListener('click', saveAccessAccountFromAdmin); $('#accessAccountRole')?.addEventListener('change', ()=>renderAccessPermissions(Array.from(document.querySelectorAll('.perm-check:checked')).map(el=>el.value))); $('#toggleQuestionBankEditorBtn')?.addEventListener('click', (e)=> toggleCollapse('questionBankEditorBody', e.currentTarget)); $('#toggleStoredQuestionsBtn')?.addEventListener('click', (e)=> toggleCollapse('storedQuestionsWrap', e.currentTarget)); document.getElementById('testMode')?.addEventListener('change', ()=>{ renderTeacherQuestionPicker(); });
 document.getElementById('testGrade')?.addEventListener('input', ()=>{ renderTeacherQuestionPicker(); });
 document.getElementById('testGrade')?.addEventListener('change', ()=>{ renderTeacherQuestionPicker(); });
 document.getElementById('testQuestionList')?.addEventListener('input', renderTeacherQuestionPicker); document.getElementById('teacherQuestionPickerList')?.addEventListener('change', (e)=>{ if (e.target && e.target.classList.contains('teacher-question-check')) syncTeacherQuestionTextarea(); }); document.getElementById('selectAllTeacherQuestionsBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('.teacher-question-check').forEach(cb => cb.checked = true); syncTeacherQuestionTextarea(); }); document.getElementById('clearTeacherQuestionsBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('.teacher-question-check').forEach(cb => cb.checked = false); syncTeacherQuestionTextarea(); }); }
@@ -1735,7 +1735,7 @@ function isDuplicateQuestionEnhanced(text, list){
 
   window.addEventListener('load', function(){
     setTimeout(bindAccountSystem, 120);
-    const adminBtn = document.getElementById('__deprecatedLegacyAdminLaunchButton');
+    const adminBtn = document.getElementById('adminLoginBtn');
     if (adminBtn && !adminBtn.dataset.v3810){
       adminBtn.dataset.v3810 = '1';
       adminBtn.addEventListener('click', function(){
@@ -2053,7 +2053,7 @@ function isDuplicateQuestionEnhanced(text, list){
   }
 
   window.addEventListener('load', function(){
-    const loginBtn = document.getElementById('__deprecatedLegacyAdminLaunchButton');
+    const loginBtn = document.getElementById('adminLoginBtn');
     if (loginBtn && !loginBtn.dataset.v3811capture){
       loginBtn.dataset.v3811capture = '1';
       loginBtn.addEventListener('click', function(){
@@ -2495,7 +2495,7 @@ function isDuplicateQuestionEnhanced(text, list){
     return true;
   };
 
-  function openAdminPanel(account){
+  function openAdminPanelLegacy(account){
     const loginCard = document.getElementById('adminLoginCard');
     const panel = document.getElementById('adminPanel');
     if (!account || !loginCard || !panel) return;
@@ -2526,7 +2526,7 @@ function isDuplicateQuestionEnhanced(text, list){
       alert(getLang()==='ar' ? 'اسم المشرف أو كلمة المرور غير صحيحة.' : 'Wrong admin name or password.');
       return;
     }
-    openAdminPanel(account);
+    openAdminPanelLegacy(account);
   }
 
   function replaceNodeWithClone(id){
@@ -2540,7 +2540,7 @@ function isDuplicateQuestionEnhanced(text, list){
   function bindProAccountManager(){
     if (!adminPageReady()) return;
 
-    const loginBtn = replaceNodeWithClone('__deprecatedLegacyAdminLaunchButton');
+    const loginBtn = replaceNodeWithClone('adminLoginBtn');
     if (loginBtn) loginBtn.addEventListener('click', handleLoginClick);
 
     const saveBtn = replaceNodeWithClone('saveAccessAccountBtn');
@@ -2562,7 +2562,7 @@ function isDuplicateQuestionEnhanced(text, list){
     });
 
     const restored = restoreSession();
-    if (restored) openAdminPanel(restored);
+    if (restored) openAdminPanelLegacy(restored);
     else {
       window.applySectionPermissions(currentAccount());
       window.renderAccessPermissions([]);
@@ -2684,7 +2684,7 @@ function isDuplicateQuestionEnhanced(text, list){
   if (!document.documentElement.dataset.v3813AccountFix) {
     document.documentElement.dataset.v3813AccountFix = '1';
     document.addEventListener('click', function(event){
-      const loginBtn = event.target.closest('#__deprecatedLegacyAdminLaunchButton');
+      const loginBtn = event.target.closest('#adminLoginBtn');
       if (loginBtn) {
         setTimeout(function(){
           resolveCurrentAccount();
@@ -3573,7 +3573,7 @@ document.addEventListener('DOMContentLoaded', function(){
     wireStudentsManagerDirect();
     patchExpandAll();
     wrapApplySectionPermissions();
-    var loginBtn = document.getElementById('__deprecatedLegacyAdminLaunchButton');
+    var loginBtn = document.getElementById('adminLoginBtn');
     if (loginBtn && loginBtn.dataset.studentsManagerLoginWired !== '1'){
       loginBtn.dataset.studentsManagerLoginWired = '1';
       loginBtn.addEventListener('click', function(){
@@ -4396,9 +4396,12 @@ document.addEventListener('click', function(e){
     var hwAnalytics = document.getElementById('homeworkAnalyticsSection');
     if (hwAnalytics && hwAnalytics.style && /none/i.test(hwAnalytics.style.display || '')) hwAnalytics.style.display = '';
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once:true });
-  else ready();
-  if (!(document.body && document.body.dataset && document.body.dataset.page === 'admin')) window.addEventListener('load', ready, { once:true });
+  var __kgStableIsAdminPage = !!(document.body && document.body.dataset && document.body.dataset.page === 'admin');
+  if (!__kgStableIsAdminPage) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once:true });
+    else ready();
+    window.addEventListener('load', ready, { once:true });
+  }
 })();
 /* ---- END final-stability-patch.js ---- */
 
@@ -4824,7 +4827,7 @@ document.addEventListener('click', function(e){
     }
   }
 
-  async function ready(){
+  async function readyAdminSecure(){
     bindAdminButtons();
     if (document.body && document.body.dataset && document.body.dataset.page === 'admin') {
       var restored = await restoreLocalSession();
@@ -4832,8 +4835,8 @@ document.addEventListener('click', function(e){
       else renderAccounts();
     }
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once:true });
-  else ready();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', readyAdminSecure, { once:true });
+  else readyAdminSecure();
 })();
 /* ---- END final-local-security-patch.js ---- */
 

@@ -62,13 +62,13 @@ module.exports = withCors(async function handler(req, res) {
 
     if (req.method === 'POST') {
       if (action === 'identify-student') {
-        const limited = checkRateLimit(req, 'homework-identify:' + String(body.studentId || body.id || '').trim().toLowerCase());
+        const limited = await checkRateLimit(req, 'homework-identify:' + String(body.studentId || body.id || '').trim().toLowerCase());
         if (!limited.ok) { res.statusCode = 429; res.end(JSON.stringify({ ok:false, error:'Too many attempts. Try again in ' + limited.retryAfter + ' seconds.' })); return; }
         const data = await backend.identifyStudent(body);
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }
       if (action === 'parent-summary') {
-        const limited = checkRateLimit(req, 'homework-parent:' + String(body.studentId || '').trim().toLowerCase());
+        const limited = await checkRateLimit(req, 'homework-parent:' + String(body.studentId || '').trim().toLowerCase());
         if (!limited.ok) { res.statusCode = 429; res.end(JSON.stringify({ ok:false, error:'Too many attempts. Try again in ' + limited.retryAfter + ' seconds.' })); return; }
         const data = await backend.parentSummary(body);
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
@@ -85,13 +85,13 @@ module.exports = withCors(async function handler(req, res) {
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }
       if (action === 'start') {
-        const limited = checkRateLimit(req, 'homework-start:' + String(body.identity && body.identity.studentId || '').trim().toLowerCase() + ':' + String(body.homeworkId || '').trim());
+        const limited = await checkRateLimit(req, 'homework-start:' + String(body.identity && body.identity.studentId || '').trim().toLowerCase() + ':' + String(body.homeworkId || '').trim());
         if (!limited.ok) { res.statusCode = 429; res.end(JSON.stringify({ ok:false, error:'Too many start requests. Try again in ' + limited.retryAfter + ' seconds.' })); return; }
         const data = await backend.start(body);
         res.statusCode = 200; res.end(JSON.stringify(data)); return;
       }
       if (action === 'submit') {
-        const limited = checkRateLimit(req, 'homework-submit:' + String(body.identity && body.identity.studentId || '').trim().toLowerCase() + ':' + String(body.homeworkId || '').trim());
+        const limited = await checkRateLimit(req, 'homework-submit:' + String(body.identity && body.identity.studentId || '').trim().toLowerCase() + ':' + String(body.homeworkId || '').trim());
         if (!limited.ok) { res.statusCode = 429; res.end(JSON.stringify({ ok:false, error:'Too many submit requests. Try again in ' + limited.retryAfter + ' seconds.' })); return; }
         const data = await backend.submit(body);
         res.statusCode = 200; res.end(JSON.stringify(data)); return;

@@ -55,7 +55,7 @@ module.exports = withCors(async function handler(req, res) {
       const body = readBody(req);
 
       if (action === 'login') {
-        const limited = checkRateLimit(req, String(body.user || '').trim().toLowerCase());
+        const limited = await checkRateLimit(req, String(body.user || '').trim().toLowerCase());
         if (!limited.ok) return setJson(res, 429, { ok: false, error: `Too many attempts. Try again in ${limited.retryAfter} seconds.` });
         const account = await backend.authenticate(body.user, body.pass, req);
         if (!account) return setJson(res, 401, { ok: false, error: 'Wrong admin name or password.' });

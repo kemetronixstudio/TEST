@@ -21,7 +21,7 @@ module.exports = withCors(async function handler(req, res) {
     const ident = body.identity || body || {};
     const identityKey = String((ident.studentId || ident.identityKey || ident.name || 'guest')).trim().toLowerCase();
     const actionKey = 'student-submit:' + identityKey + ':' + String(body.quizKey || body.quizId || body.quiz || '');
-    const limited = checkRateLimit(req, actionKey);
+    const limited = await checkRateLimit(req, actionKey);
     if (!limited.ok) {
       res.statusCode = 429;
       res.setHeader('Content-Type', 'application/json');
