@@ -4503,6 +4503,46 @@ document.addEventListener('click', function(e){
   var ACCESS_KEY = 'kgEnglishAccessAccountsV26';
   var SESSION_KEY = 'kgEnglishAccessSessionV1';
   var HOMEWORK_KEY = 'kgHomeworkStaticStoreV1';
+  var BUILTIN_EMBEDDED = [
+  {
+    "user": "KEMETRONIX",
+    "role": "admin",
+    "permissions": [
+      "dashboard",
+      "levelVisibility",
+      "timerSettings",
+      "quizAccess",
+      "teacherTest",
+      "bulkQuestions",
+      "questionBank",
+      "classManager",
+      "homeworkAnalytics",
+      "homeworkBuilder",
+      "homeworkReports",
+      "accountManager"
+    ],
+    "passwordHash": "pbkdf2$120000$671674e88a901eef94803e223c930572$228e04851c36f85ad1b29aedf49ad257722f238336100656f9c71943656f0bb0"
+  },
+  {
+    "user": "Dr. Tarek",
+    "role": "admin",
+    "permissions": [
+      "dashboard",
+      "levelVisibility",
+      "timerSettings",
+      "quizAccess",
+      "teacherTest",
+      "bulkQuestions",
+      "questionBank",
+      "classManager",
+      "homeworkAnalytics",
+      "homeworkBuilder",
+      "homeworkReports",
+      "accountManager"
+    ],
+    "passwordHash": "pbkdf2$120000$b5fcc3ade1b337fb6835c6c8d86e4eba$f51ba3c163d67d3eed21a345f55caae0310f03b8aef10d02e369ab41dd88d24a"
+  }
+];
   var BUILTIN_CACHE = null;
 
   function normalizeUser(v){ return String(v || '').trim().toLowerCase(); }
@@ -4576,9 +4616,9 @@ document.addEventListener('click', function(e){
   async function fetchBuiltinAdmins(){
     if (BUILTIN_CACHE) return BUILTIN_CACHE;
     try {
-      var res = await fetch('data/builtin-access-accounts.json', { cache: 'no-store' });
-      var data = await res.json();
-      BUILTIN_CACHE = Array.isArray(data) ? data : [];
+      BUILTIN_CACHE = (Array.isArray(BUILTIN_EMBEDDED) ? BUILTIN_EMBEDDED : []).map(function(row){
+        return sanitizeStoredAccount(row);
+      }).filter(Boolean);
     } catch (error) {
       BUILTIN_CACHE = [];
     }

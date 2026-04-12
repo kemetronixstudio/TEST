@@ -1,7 +1,7 @@
 # Dr. Tarek Quiz App
 
 ## Included fixes in this bundle
-- Local admin login works again on static hosting by validating the hashed bootstrap admin from `data/builtin-access-accounts.json` in the browser.
+- Local admin login works again on static hosting by validating the embedded hashed bootstrap admin accounts in the browser.
 - Frontend hardcoded admin passwords remain removed.
 - Local editable staff/admin accounts now save as PBKDF2 hashes instead of plaintext in localStorage.
 - Dead `legacyAdminLaunchButton` wiring was retired from the live login path.
