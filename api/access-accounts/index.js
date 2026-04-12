@@ -52,7 +52,7 @@ module.exports = withCors(async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const body = readBody(req);
+      const body = await readBody(req);
 
       if (action === 'login') {
         const limited = await checkRateLimit(req, String(body.user || '').trim().toLowerCase());
@@ -87,7 +87,7 @@ module.exports = withCors(async function handler(req, res) {
       const auth = await backend.requireAdmin(req);
       if (!auth.ok) return setJson(res, auth.status, { ok: false, error: auth.error });
       setAuthCookie(req, res, auth.token);
-      const body = readBody(req);
+      const body = await readBody(req);
       const result = await backend.deleteAccount(body, auth.account);
       return setJson(res, 200, { ...result, token: auth.token });
     }

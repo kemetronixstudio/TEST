@@ -507,7 +507,7 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
     const user = document.getElementById('adminUser') && document.getElementById('adminUser').value || '';
     const pass = document.getElementById('adminPass') && document.getElementById('adminPass').value || '';
     try {
-      const payload = await api('?action=login', { method: 'POST', body: JSON.stringify({ user: user, pass: pass }), headers: { Authorization: '' } });
+      const payload = await api('?action=login', { method: 'POST', body: JSON.stringify({ user: user, pass: pass }), headers: {} });
       persistSession(payload.account, payload.token);
       setPanelVisible(payload.account);
       if (typeof window.renderAccessPermissions === 'function') window.renderAccessPermissions([]);
@@ -522,6 +522,10 @@ if (typeof window.askTextInput !== 'function') window.askTextInput = function as
 
   async function restoreBackendSession(){
     const token = readToken();
+    if (!token) {
+      forceLoginView();
+      return false;
+    }
     try {
       const payload = await api('?action=me', { method: 'GET' });
       persistSession(payload.account, payload.token || token);

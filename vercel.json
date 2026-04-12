@@ -40,6 +40,11 @@
       "source": "/lib/(.*)",
       "destination": "/404.html",
       "permanent": false
+    },
+    {
+      "source": "/server-config/(.*)",
+      "destination": "/404.html",
+      "permanent": false
     }
   ]
 }

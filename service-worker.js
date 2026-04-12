@@ -1,4 +1,4 @@
-const CACHE = 'kg-english-v-clean-audit-6';
+const CACHE = 'kg-english-v-clean-audit-7';
 const ASSETS = [
   "./index.html",
   "./kg1.html",
@@ -9,6 +9,7 @@ const ASSETS = [
   "./play.html",
   "./homework.html",
   "./parent.html",
+  "./404.html",
   "./style.css",
   "./remove-empty-box.css",
   "./manifest.json",

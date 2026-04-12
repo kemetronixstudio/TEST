@@ -1,4 +1,4 @@
-const { applyCors, readJsonBody } = require('../../lib/api-security');
+const { applyCors, readJsonBody, checkRateLimit } = require('../../lib/api-security');
 const backend = require('../../lib/student-cloud-backend');
 const accessBackend = require('../../lib/access-accounts-backend');
 
@@ -16,6 +16,13 @@ module.exports = withCors(async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       if (action === 'leaderboard' || !action) {
+        const limited = await checkRateLimit(req, 'play-leaderboard');
+        if (!limited.ok) {
+          res.statusCode = 429;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: `Too many requests. Try again in ${limited.retryAfter} seconds.` }));
+          return;
+        }
         const result = await backend.getPlayLeaderboard();
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
